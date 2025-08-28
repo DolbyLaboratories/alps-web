@@ -1,0 +1,8 @@
+{
+    "transform": {
+        "\\.js$": ["babel-jest", { "configFile": "./babel.test.config.json" }]
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!variables/.*)"
+    ]
+}
