@@ -30,29 +30,34 @@
  */
 
 import * as isoBmffBox from "./constants/isobmff_box_names.js";
-import * as tocElements from "./constants/toc_elements.js";
-import { setBits, shiftLeft } from "./bitwise_operations.js";
+
+import { processIsoBmffInitSegment, processIsoBmffMediaSegment } from "./alps_core.js";
+
 import ISOBoxer from "codem-isoboxer";
-import { getSampleOffsets } from "./get_sample_offsets.js";
-import { parseTocElements } from "./ac4_toc_parser_wrapper";
 
-const PRESENTATION_LEVEL_WIDTH = 3;
-const UNDECODABLE_PRESENTATION_LEVEL = 7;
-const BITS_TO_SHIFT_TO_DIVIDE_BY_8 = 3;
-
-const elementsToParse = [
-  tocElements.PRESENTATION_LEVEL,
-  tocElements.B_PRESENTATION_ID,
-  tocElements.PRESENTATION_ID,
-  tocElements.PAYLOAD_BASE_MINUS1,
-  tocElements.BYTE_ALIGNMENT,
-  tocElements.AC4_TOC_END,
-];
+const SEGMENT_TYPES = {
+  INIT: "init",
+  MEDIA: "media",
+};
 
 /**
  * This callback is called when list of presentations changes, eg. new init segment is processed for multi-period dash contents.
  *
  * @callback presentationsChangedCallback
+ * @param {PresentationsChangedEvent} event
+ */
+
+/**
+ * PresentationsChanged event object
+ * @typedef {Object} PresentationsChangedEvent
+ * @property {string|null} streamId - ID of the stream for which the presentations were parsed
+ */
+
+/**
+ * ALPS Data for stream
+ * @typedef {Object} Stream
+ * @property {Presentation[]} presentations - presentation related to the stream
+ * @property {number|undefined} activePresentationId - current active presentation ID for the stream
  */
 
 /**
@@ -64,18 +69,47 @@ const elementsToParse = [
  */
 
 /**
+ * Buffer processing result.
+ * @typedef {Object} ProcessIsoBmffSegmentResult
+ * @property {string} segmentType - type of detected segment "init" or "media"
+ * @property {Presentation[]|null} presentations - data returned only for "init" segment, list of presentations read from init segment isobmff
+ * @property {number|null} forcedPresentationId - data returned only for "media" segment, ID of presentation selected for playback, null when no presentation was selected
+ */
+
+/**
  * Provides the core functionality of the library. It allows to process ISOBMFF segments and manage presentations.
  */
 export class Alps {
-  #presentations = [];
-  #activePresentationId;
+  #streams = {};
   #presentationsChangedEventHandler;
+
+  #initializeStream(streamId) {
+    if (this.#streams[streamId] === undefined) {
+      this.#streams[streamId] = { activePresentationId: -1, presentations: [] };
+    }
+  }
 
   /**
    * Create the ALPS object
    */
   constructor() {
     console.log("ALPS::constructor");
+  }
+
+  /**
+   * Get presentation and activePresentationId for all streams
+   * @returns {Stream[]} Data for all streams present in current ALPS state
+   */
+  getStreams() {
+    return this.#streams;
+  }
+
+  /**
+   * Clear data for unused stream
+   * @param {string|null} streamId Stream Id which should be deleted
+   */
+  clearStream(streamId = null) {
+    delete this.#streams[streamId];
   }
 
   /**
@@ -89,210 +123,85 @@ export class Alps {
 
   /**
    * Get the list of available presentations
+   * @param {string|null} streamId The ID of the stream
    * @returns {Presentation[]} An array of presentation objects containing id, label, and language properties
    */
-  getPresentations() {
-    console.log(`ALPS::getPresentations - List of presentations: ${JSON.stringify(this.#presentations)}`);
-    return this.#presentations;
+  getPresentations(streamId = null) {
+    this.#initializeStream(streamId);
+    console.log(
+      `ALPS::getPresentations - List of presentations: ${JSON.stringify(this.#streams[streamId].presentations)}`,
+    );
+    return this.#streams[streamId].presentations;
   }
 
   /**
    * Get the ID of the currently active presentation
-   * @returns {number|undefined} The ID of the active presentation or undefined if no presentation is set
+   * @param {string|null} streamId The ID of the stream
+   * @returns {number|undefined} The ID of the active presentation or -1 if no presentation is set
    */
-  getActivePresentationId() {
-    console.log(`ALPS::getActivePresentation - activePresentation: ${this.#activePresentationId}`);
-    return this.#activePresentationId;
+  getActivePresentationId(streamId = null) {
+    console.log(`ALPS::getActivePresentation - activePresentation: ${this.#streams[streamId]?.activePresentationId}`);
+    return this.#streams[streamId]?.activePresentationId;
   }
 
   /**
    * Set the ID of the active presentation
-   * @param {number|undefined} presentationId - The ID of the presentation to set as active or undefined to select the default presentation
+   * @param {number|undefined} presentationId - The ID of the presentation to set as active or -1 to select the default presentation
+   * @param {string|null} streamId The ID of the stream
    */
-  setActivePresentationId(presentationId) {
+  setActivePresentationId(presentationId, streamId = null) {
     console.log(`ALPS::setActivePresentation - new activePresentation: ${presentationId}`);
-    this.#activePresentationId = presentationId;
+    this.#initializeStream(streamId);
+    this.#streams[streamId].activePresentationId = presentationId;
   }
 
   /**
    * Process an ISOBMFF segment buffer
    * @param {ArrayBuffer} segmentBuffer - The ISOBMFF segment buffer to process
+   * @param {string|null} streamId - Stream ID for Segment buffer
+   * @param {number|undefined} activePresentationId - Forced presentation ID that should be selected for processing, use -1 for TV default, and leave undefined to use value set by setActivePresentationId, this parameter takes precedence over this.activePresentationId
+   * @returns {ProcessIsoBmffSegmentResult} Data retrieved from processed segment
    */
-  processIsoBmffSegment(segmentBuffer) {
+  processIsoBmffSegment(segmentBuffer, streamId = null, activePresentationId = undefined) {
     // parse the segment that was just handed in
     console.log("ALPS::processIsoBmffSegment");
+
+    let forcedPresentationId = null;
+    let presentations = null;
+    let segmentType = null;
+
     const parsedSegmentBuffer = ISOBoxer.parseBuffer(segmentBuffer);
+
     const movie = parsedSegmentBuffer.fetch(isoBmffBox.MOVIE);
     const meta = parsedSegmentBuffer.fetch(isoBmffBox.META);
+    const movieFragment = parsedSegmentBuffer.fetch(isoBmffBox.MOVIE_FRAGMENT);
+
+    this.#initializeStream(streamId);
+    const stream = this.#streams[streamId];
 
     // if this is the init segment - parse presentations
     if (movie && meta) {
-      console.log("ALPS::processIsoBmffSegment - found init segment");
+      presentations = processIsoBmffInitSegment(parsedSegmentBuffer);
+      stream.presentations = presentations;
 
-      // Any new init segment replaces the old contents entirely.
-      this.#presentations = [];
-      const groupsList = meta && meta.boxes.find((box) => box.type === isoBmffBox.GROUPS_LIST);
-      const preselectionGroups =
-        groupsList && groupsList.boxes.filter((box) => box.type === isoBmffBox.PRESELECTION_GROUP);
-      const tracks = movie.boxes.filter((box) => box.type === isoBmffBox.TRACK);
-      const trackIds = tracks.map((track) => {
-        const trackHeader = track.boxes.find((box) => box.type === isoBmffBox.TRACK_HEADER);
-        return trackHeader.track_ID;
-      });
-
-      for (const preselectionGroup of preselectionGroups) {
-        // filter out those preselection groups that reference tracks only from within this file
-        // (that is, where every entity_ID is also the ID of a track in the file)
-        // and that have a preselection_tag set so that we reference to it
-        if (
-          preselectionGroup.entities.every((entity) => trackIds.includes(entity.entity_id)) &&
-          preselectionGroup.preselection_tag
-        ) {
-          const id = parseInt(preselectionGroup.preselection_tag, 10);
-
-          const labelBox = preselectionGroup.boxes.find((box) => box.type === isoBmffBox.LABEL && !box.is_group_label);
-          const label = labelBox ? labelBox.label : undefined;
-
-          const languageBox = preselectionGroup.boxes.find((box) => box.type === isoBmffBox.EXTENDED_LANGUAGE_TAG);
-          const language = languageBox ? languageBox.extended_language : undefined;
-
-          // append parsed presentation object
-          this.#presentations.push({ id, label, language });
-        }
-      }
       if (this.#presentationsChangedEventHandler) {
-        this.#presentationsChangedEventHandler();
+        this.#presentationsChangedEventHandler({ streamId });
       }
+      segmentType = SEGMENT_TYPES.INIT;
     }
 
-    const movieFragment = parsedSegmentBuffer.fetch(isoBmffBox.MOVIE_FRAGMENT);
     if (movieFragment) {
-      console.log(
-        `ALPS::processIsoBmffSegment - processing moof media. ActivePresentation: ${this.#activePresentationId}`,
+      forcedPresentationId = processIsoBmffMediaSegment(
+        parsedSegmentBuffer,
+        activePresentationId || stream.activePresentationId,
       );
-      const activePresentation = this.#presentations.find(
-        (presentation) => presentation.id === this.#activePresentationId,
-      );
-
-      // If there is no selected presentation, return an unmodified buffer
-      if (activePresentation === undefined) {
-        console.log("ALPS::processIsoBmffSegment - presentation not found. Return unmodified buffer");
-        return;
-      }
-
-      console.log("ALPS::processIsoBmffSegment - found data segment, enabled pres: ", activePresentation);
-
-      // this is the data segment
-      // determine the offsets to all samples
-      const sampleOffsets = getSampleOffsets(parsedSegmentBuffer);
-
-      console.log(`ALPS::processIsoBmffSegment - obtained ${sampleOffsets.length} sample offsets`);
-
-      for (const sampleOffset of sampleOffsets) {
-        const sampleData = new DataView(parsedSegmentBuffer._raw.buffer, sampleOffset.offset, sampleOffset.size);
-        const parsedElements = parseTocElements(sampleData, elementsToParse);
-
-        let accumulatedShift = 0;
-        const payloadBaseMinus1 = parsedElements.find((element) => element.name === tocElements.PAYLOAD_BASE_MINUS1);
-        const byteAlignment = parsedElements.find((element) => element.name === tocElements.BYTE_ALIGNMENT);
-        if (byteAlignment) {
-          accumulatedShift = byteAlignment.width;
-        }
-
-        const ac4TocEnd = parsedElements.find((element) => element.name === tocElements.AC4_TOC_END);
-
-        // filter the table to produce a list of preselections complete with ID, a list of b_presentation_ids and a list of presentation_ids
-        const presentationOffsets = [];
-        const bPresentationIds = [];
-
-        parsedElements.forEach((element) => {
-          switch (element.name) {
-            case tocElements.PRESENTATION_LEVEL: {
-              presentationOffsets.push({ pos: element.pos, value: element.value, width: element.width });
-              break;
-            }
-            case tocElements.PRESENTATION_ID: {
-              const lastPresentationOffset = presentationOffsets[presentationOffsets.length - 1];
-
-              // modify last seen presentation. If there was none, this is an error:
-              // a presentation_id would always follow, never preceed, the level
-              if (presentationOffsets.length === 0) {
-                console.error("Encountered a presentationID without a presentation");
-              }
-              if (element.handler === "before_call") {
-                lastPresentationOffset.presentationIdPos = element.pos;
-              }
-              if (element.handler === "after_call") {
-                lastPresentationOffset.presentationId = element.value;
-                const width = element.pos - lastPresentationOffset.presentationIdPos;
-                lastPresentationOffset.presentationIdWidth = width;
-                accumulatedShift += width;
-              }
-              break;
-            }
-            case tocElements.B_PRESENTATION_ID: {
-              bPresentationIds.push(element);
-              break;
-            }
-            default: {
-              console.error(`Unknown TOC parsed element: ${element.name}`);
-            }
-          }
-        });
-
-        // check that all presentations carry an ID
-        if (presentationOffsets.some((presentation) => presentation.presentationId === undefined)) {
-          console.error("Not every presentation carries an ID");
-          return;
-        }
-
-        if (presentationOffsets.every((offset) => offset.presentationId !== this.#activePresentationId)) {
-          console.log("ALPS::processIsobmffSegment - activePresentationId not found in TOC");
-          return;
-        }
-
-        // set presentation level to 7 for inactive presentations
-        presentationOffsets.forEach((presentation) => {
-          const presentationId = presentation.presentationId;
-
-          if (presentation.width !== PRESENTATION_LEVEL_WIDTH) {
-            console.warn(`Presentation level has unexpected width: ${presentation.width}`);
-          }
-
-          // in all presentations except the selected one, overwrite presentation level with "7"
-          if (this.#activePresentationId !== presentationId) {
-            // updating inactive presentation with undecodable presentation level
-            setBits(sampleData, presentation.pos, presentation.width, UNDECODABLE_PRESENTATION_LEVEL);
-          }
-        });
-
-        // add available bytes to payload_base_minus1 (>>> is more efficient than Math.floor)
-        const availableAdditionalBytes = accumulatedShift >>> BITS_TO_SHIFT_TO_DIVIDE_BY_8;
-        if (payloadBaseMinus1) {
-          // update payloadbase_minus_1
-          setBits(
-            sampleData,
-            payloadBaseMinus1.pos,
-            payloadBaseMinus1.width,
-            payloadBaseMinus1.value + availableAdditionalBytes,
-          );
-
-          // set all b_presentation_id fields to 0
-          bPresentationIds.forEach((bPresentationId) => {
-            setBits(sampleData, bPresentationId.pos, bPresentationId.width, 0);
-          });
-
-          // bit shifting
-          presentationOffsets
-            .slice()
-            .reverse()
-            .forEach((presentation) => {
-              const shiftWidth = ac4TocEnd.pos - presentation.presentationIdPos;
-              shiftLeft(sampleData, presentation.presentationIdPos, shiftWidth, presentation.presentationIdWidth);
-            });
-        }
-      }
+      segmentType = SEGMENT_TYPES.MEDIA;
     }
     console.log("ALPS::processIsoBmffSegment - done");
+    return {
+      forcedPresentationId,
+      presentations,
+      segmentType,
+    };
   }
 }

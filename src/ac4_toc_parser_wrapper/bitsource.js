@@ -58,11 +58,12 @@ export class BitSource {
    * @summary Get a value of specified width from the bit source
    *
    * @param {string} varname - Name of the variable being read (it serves only logging purposes)
-   * @param {number} bitsWidth - Width of the value to be read (maximum 24 bits)
+   * @param {number} bitsWidth - Width of the value to be read (maximum 25 bits)
    * @returns {number} The value read from the bit source
    */
   get(varname, bitsWidth) {
-    const MAX_SUPPORTED_WIDTH = 24;
+    const MAX_SHIFT = 24;
+    const MAX_SUPPORTED_WIDTH = 25;
     const BYTE_SIZE = 8;
     const INT_SIZE = 32;
     // make sure the BitSource supports reading value with given width
@@ -75,7 +76,11 @@ export class BitSource {
     let width = bitsWidth;
     while (this.bitsLeft < width) {
       const nextByte = this.iterator.next();
-      this.cache |= nextByte.value << (MAX_SUPPORTED_WIDTH - this.bitsLeft);
+
+      // calculate the shift to not overwrite the cache
+      const nextByteShift = MAX_SHIFT - this.bitsLeft;
+
+      this.cache |= nextByte.value << nextByteShift;
       this.bitsLeft += BYTE_SIZE;
       /*
         We may have an AC-4 stream with field width >= 25/32 bits,

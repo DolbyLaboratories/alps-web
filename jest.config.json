@@ -1,8 +1,7 @@
 {
-    "transform": {
-        "\\.js$": ["babel-jest", { "configFile": "./babel.test.config.json" }]
-    },
-    "transformIgnorePatterns": [
-      "node_modules/(?!variables/.*)"
-    ]
+  "coveragePathIgnorePatterns": ["ac4_toc_parser.js"],
+  "transform": {
+    "\\.js$": ["babel-jest", { "configFile": "./babel.test.config.json" }]
+  },
+  "transformIgnorePatterns": ["node_modules/(?!variables/.*)"]
 }

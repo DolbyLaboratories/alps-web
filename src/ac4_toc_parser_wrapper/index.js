@@ -47,7 +47,7 @@ import { Parser } from "../ac4_toc_parser.js";
  * Parses the TOC from an AC-4 bitstream with filtering specified elements
  * @param {DataView} data - DataView that represents individual media sample
  * @param {string[]} elements - The AC-4 TOC elements to be filtered
- * returns {ElementData[]} An array of objects containing the parsed elements
+ * @returns {ElementData[]|null} An array of objects containing the parsed elements
  */
 const parseTocElements = (data, elements) => {
   let parsedElements = [];

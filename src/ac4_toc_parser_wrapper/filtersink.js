@@ -27,7 +27,7 @@
  * @desc This file provides a sink class for AC-4 TOC parser callback handling and filtering.
  */
 
-import { BYTE_ALIGNMENT } from "../constants/toc_elements";
+import { BYTE_ALIGNMENT } from "../constants/toc_elements.js";
 
 /**
  * This callback is called when configured element is found while parsing

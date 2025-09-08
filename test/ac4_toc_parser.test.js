@@ -1,18 +1,26 @@
+import fs from "fs";
+
 describe("#Parser", () => {
-  describe("Verify that Source callbacks aren't called", () => {
-    it.todo("Verify that enter_call isn't called");
-    it.todo("Verify that leave_call isn't called");
-    it.todo("Verify that next_frame isn't called");
+  /* global __dirname */
+  const parser = fs.readFileSync(`${__dirname}/../src/ac4_toc_parser.js`, "utf-8");
+
+  describe("Source callbacks validations", () => {
+    const whitelist = new Set(["get", "get_align"]);
+    const regex = /this\.BAM_source\.([a-zA-Z0-9_]+)\s*\(/g;
+
+    it("should use all callbacks from whitelist", () => {
+      const matches = new Set([...parser.matchAll(regex)].map((match) => match[1]));
+      expect(matches).toEqual(whitelist);
+    });
   });
 
-  describe("Verify that Sink callbacks aren't called", () => {
-    it.todo("Verify that after_assign isn't called");
-    it.todo("Verify that after_align isn't called");
-    it.todo("Verify that after_add isn't called");
-    it.todo("Verify that after_lshift isn't called");
-    it.todo("Verify that after_assert isn't called");
-    it.todo("Verify that after_error isn't called");
-    it.todo("Verify that before_rule isn't called");
-    it.todo("Verify that after_rule isn't called");
+  describe("Sink callbacks validation", () => {
+    const whitelist = new Set(["before_call", "after_call", "after_position", "write_uint", "write_align"]);
+    const regex = /this\.BAM_sink\.([a-zA-Z0-9_]+)\s*\(/g;
+
+    it("should use all callbacks from whitelist", () => {
+      const matches = new Set([...parser.matchAll(regex)].map((match) => match[1]));
+      expect(matches).toEqual(whitelist);
+    });
   });
 });

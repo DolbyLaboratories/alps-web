@@ -47,6 +47,16 @@ export default [
     files: ["src/ac4_toc_parser_wrapper/index.js"],
   },
   {
+    rules: {
+      "prettier/prettier": [
+        "error",
+        {
+          endOfLine: "auto",
+        },
+      ],
+    },
+  },
+  {
     ignores: ["dist/", "src/ac4_toc_parser.js"],
   },
   {
