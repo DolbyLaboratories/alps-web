@@ -96,6 +96,31 @@ And an example using dash.js version 5 player:
 
 ```
 
+Here is an example for [shaka player](https://github.com/shaka-project/shaka-player):
+
+```html
+<script>
+    async function init() {
+        const url = "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd";
+
+        const video = document.querySelector("video");
+        const player = new shaka.Player();
+        await player.attach(video);
+
+        const alps = new Alps();
+        const user = { presentationId: 1 };
+
+        player.getNetworkingEngine().registerResponseFilter((type, response, context) => {
+           if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT && context?.codecs?.startsWith('ac-4')) {
+             alps.processIsoBmffSegment(response.data, null, user.presentationId);
+           }
+        });
+
+        await player.load(url);
+    }
+</script>
+```
+
 ## API
 
 ### Alps
