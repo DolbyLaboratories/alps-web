@@ -110,13 +110,6 @@ Here is an example for [shaka player](https://github.com/shaka-project/shaka-pla
         const alps = new Alps();
         const user = { presentationId: 1 };
 
-        const interceptor: ResponseInterceptor = (response: CommonMediaResponse) => {
-          if (response.request.customData?.request?.representation?.codecFamily === 'ac-4') {
-            alps.processIsoBmffSegment(response.data, null, user.presentationId);
-          }
-          return Promise.resolve(response)
-        }
-
         player.getNetworkingEngine().registerResponseFilter((type, response, context) => {
            if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT && context?.codecs?.startsWith('ac-4') {
              alps.processIsoBnffSegment(response.data, null, user.presentationId);
