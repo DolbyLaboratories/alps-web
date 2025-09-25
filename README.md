@@ -112,7 +112,7 @@ Here is an example for [shaka player](https://github.com/shaka-project/shaka-pla
 
         player.getNetworkingEngine().registerResponseFilter((type, response, context) => {
            if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT && context?.codecs?.startsWith('ac-4')) {
-             alps.processIsoBnffSegment(response.data, null, user.presentationId);
+             alps.processIsoBmffSegment(response.data, null, user.presentationId);
            }
         });
 
