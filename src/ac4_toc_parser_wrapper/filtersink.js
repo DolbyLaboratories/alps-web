@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2023-2024 by Dolby International AB.
+ *                Copyright (C) 2023-2025 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -37,7 +37,7 @@ import { BYTE_ALIGNMENT } from "../constants/toc_elements.js";
  * @param {number} value
  * @param {number} width
  * @param {number} position
- * @param {string} handler
+ * @param {string} [handler]
  */
 
 /** Handles the callback and filtering functionality for AC-4 TOC parser */
@@ -104,7 +104,7 @@ export class FilterSink {
 
   /**
    * Called after BSDL position() call to obtain bit position
-   * @param {number} name - name of the variable that the position will be assigned to
+   * @param {string} name - name of the variable that the position will be assigned to
    * @param {number} position - obtained position
    */
   after_position(name, position) {

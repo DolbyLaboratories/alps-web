@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Module: bitwise_operations</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Module: bitwise_operations</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        
+            
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description">This file contains functions for performing bitwise operations on byte arrays (DataView objects).</div>
+        
+
+        
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="bitwise_operations.js.html">bitwise_operations.js</a>, <a href="bitwise_operations.js.html#line27">line 27</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~setBits"><span class="type-signature">(inner) </span>setBits<span class="signature">(data, offset, width, value)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Sets a range of bits within a byte array to a specified value.</p>
+    
+
+
+
+<div class="description">
+    This function modifies a range of bits within a byte array by setting them to a given value. It handles cases where the bit range spans across maximum of two bytes.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">DataView</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The byte array in which the bits will be replaced</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>offset</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The start index of the bit range to set (must be >= 0)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>width</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The number of bits to set (must be >= 0)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>value</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The value to set the bits to (must fit within the specified width)</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="bitwise_operations.js.html">bitwise_operations.js</a>, <a href="bitwise_operations.js.html#line108">line 108</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const arrayBuffer = new ArrayBuffer(2);
+const dataView = new DataView(arrayBuffer);
+dataView.setUint8(0, 0b10101010);
+dataView.setUint8(1, 0b01010101);
+setBits(dataView, 5, 4, 0b1011);
+// dataView = [0b10101101, 0b11010101]</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~shiftLeft"><span class="type-signature">(inner) </span>shiftLeft<span class="signature">(data, offset, width, shift)</span><span class="type-signature"> &rarr; {DataView}</span></h4>
+    
+
+    
+    <p class="summary">Shifts a range of bits within a byte array left by a specified amount.</p>
+    
+
+
+
+<div class="description">
+    Shifts the specified range of bits left without shifting bits outside the range.
+Zeros are pushed in from the right side to maintain width.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">DataView</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The byte array containing the bits to shift</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>offset</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The start index of the bit range to shift (must be >= 0)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>width</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The number of bits to shift (must be >= 0)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>shift</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The number of positions to shift left (must be >= 0)</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="bitwise_operations.js.html">bitwise_operations.js</a>, <a href="bitwise_operations.js.html#line51">line 51</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The same byte array with the bits shifted in-place
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">DataView</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const arrayBuffer = new ArrayBuffer(1);
+const dataView = new DataView(arrayBuffer);
+dataView.setUint8(0, 0b01011101);
+shiftLeft(dataView, 3, 3, 3)
+// dataView = [0b01000001]</code></pre>
+
+
+
+        
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-ac4_toc_parser.html">ac4_toc_parser</a></li><li><a href="module-ac4_toc_parser_wrapper_bitsource.html">ac4_toc_parser_wrapper/bitsource</a></li><li><a href="module-ac4_toc_parser_wrapper_filtersink.html">ac4_toc_parser_wrapper/filtersink</a></li><li><a href="module-ac4_toc_parser_wrapper_index.html">ac4_toc_parser_wrapper/index</a></li><li><a href="module-alps.html">alps</a></li><li><a href="module-alps_core.html">alps_core</a></li><li><a href="module-bitwise_operations.html">bitwise_operations</a></li><li><a href="module-constants_isobmff_box_names.html">constants/isobmff_box_names</a></li><li><a href="module-constants_toc_elements.html">constants/toc_elements</a></li><li><a href="module-get_sample_offsets.html">get_sample_offsets</a></li><li><a href="module-types.html">types</a></li></ul><h3>Classes</h3><ul><li><a href="module-ac4_toc_parser_wrapper_bitsource.BitSource.html">BitSource</a></li><li><a href="module-ac4_toc_parser_wrapper_filtersink.FilterSink.html">FilterSink</a></li><li><a href="module-alps.Alps.html">Alps</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Dec 12 2025 11:49:27 GMT+0100 (Central European Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

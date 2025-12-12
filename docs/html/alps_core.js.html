@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: alps_core.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: alps_core.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/************************************************************************************************************
+ *                Copyright (C) 2023-2025 by Dolby International AB.
+ *                All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without modification, are permitted
+ * provided that the following conditions are met:
+
+ * 1. Redistributions of source code must retain the above copyright notice, this list of conditions
+ *    and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions
+ *    and the following disclaimer in the documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or
+ *    promote products derived from this software without specific prior written permission.
+
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE.
+ ************************************************************************************************************/
+
+/*global console*/
+
+/**
+ * @module
+ * @desc AlpsCore
+ */
+
+import * as isoBmffBox from "./constants/isobmff_box_names.js";
+import * as tocElements from "./constants/toc_elements.js";
+import { setBits, shiftLeft } from "./bitwise_operations.js";
+import { getSampleOffsets } from "./get_sample_offsets.js";
+import { parseTocElements } from "./ac4_toc_parser_wrapper/index.js";
+
+const PRESENTATION_LEVEL_WIDTH = 3;
+const UNDECODABLE_PRESENTATION_LEVEL = 7;
+const BITS_TO_SHIFT_TO_DIVIDE_BY_8 = 3;
+const MINIMUM_PRESENTATIONS_AMOUNT = 2;
+const DIALOG_GAIN_ADJUSTMENT_FACTOR = 256;
+
+const elementsToParse = [
+  tocElements.PRESENTATION_LEVEL,
+  tocElements.B_PRESENTATION_ID,
+  tocElements.PRESENTATION_ID,
+  tocElements.PAYLOAD_BASE_MINUS1,
+  tocElements.BYTE_ALIGNMENT,
+  tocElements.AC4_TOC_END,
+];
+
+/**
+ * Provides the core functionality of the library. It allows to process ISOBMFF segments and manage presentations.
+ */
+/**
+ * Process an ISOBMFF Init segment buffer
+ * @param {ISOBoxer} parsedSegmentBuffer - The ISOBMFF segment buffer to process
+ * @returns {import('./types').Presentation[]} - List of presentations read from Init ISOBMFF Segment
+ */
+const processIsoBmffInitSegment = (parsedSegmentBuffer) => {
+  // parse the segment that was just handed in
+  const movie = parsedSegmentBuffer.fetch(isoBmffBox.MOVIE);
+  const meta = parsedSegmentBuffer.fetch(isoBmffBox.META);
+
+  console.log("ALPS::processIsoBmffSegment - found init segment");
+
+  // Any new init segment replaces the old contents entirely.
+  const presentations = [];
+  const groupsList = meta &amp;&amp; meta.boxes.find((box) => box.type === isoBmffBox.GROUPS_LIST);
+  const preselectionGroups = groupsList &amp;&amp; groupsList.boxes.filter((box) => box.type === isoBmffBox.PRESELECTION_GROUP);
+  const tracks = movie &amp;&amp; movie.boxes.filter((box) => box.type === isoBmffBox.TRACK);
+  const trackIds =
+    tracks?.map((track) => {
+      const trackHeader = track.boxes.find((box) => box.type === isoBmffBox.TRACK_HEADER);
+      return trackHeader.track_ID;
+    }) ?? [];
+
+  if (Array.isArray(preselectionGroups)) {
+    for (const preselectionGroup of preselectionGroups) {
+      // filter out those preselection groups that reference tracks only from within this file
+      // (that is, where every entity_ID is also the ID of a track in the file)
+      if (preselectionGroup.entities.every((entity) => trackIds.includes(entity.entity_id))) {
+        const parsedPreselectionTag = parseInt(preselectionGroup.preselection_tag, 10);
+        const id = isNaN(parsedPreselectionTag) ? null : parsedPreselectionTag;
+
+        const selectionPriority = preselectionGroup.selection_priority ?? null;
+
+        const udtaBox = preselectionGroup.boxes.find((box) => box.type === isoBmffBox.USER_DATA);
+        const diapBox = udtaBox?.boxes.find((box) => box.type === isoBmffBox.DIALOG_PROCESSING);
+        const dialogGain = Number.isInteger(diapBox?.dialog_gain)
+          ? diapBox.dialog_gain / DIALOG_GAIN_ADJUSTMENT_FACTOR
+          : null;
+
+        const languageBox = preselectionGroup.boxes.find((box) => box.type === isoBmffBox.EXTENDED_LANGUAGE_TAG);
+        const extendedLanguage = languageBox?.extended_language ?? null;
+
+        const audioRenderingIndicationBox = preselectionGroup.boxes.find(
+          (box) => box.type === isoBmffBox.AUDIO_RENDERING_INDICATION,
+        );
+        const audioRenderingIndication = audioRenderingIndicationBox?.audio_rendering_indication ?? null;
+
+        const labelBoxes = preselectionGroup.boxes.filter((box) => box.type === isoBmffBox.LABEL);
+        const labels = labelBoxes.map((labelBox) => ({
+          isGroupLabel: labelBox.is_group_label,
+          label: labelBox.label,
+          labelId: labelBox.label_id,
+          language: labelBox.language,
+        }));
+
+        const kindBoxes = preselectionGroup.boxes.filter((box) => box.type === isoBmffBox.KIND);
+        const kinds = kindBoxes.map((kindBox) => ({
+          schemeURI: kindBox.schemeURI,
+          value: kindBox.value,
+        }));
+
+        // append parsed presentation object
+        presentations.push({
+          audioRenderingIndication,
+          dialogGain,
+          extendedLanguage,
+          id,
+          kinds,
+          labels,
+          selectionPriority,
+        });
+      }
+    }
+  } else {
+    console.log("ALPS::processIsoBmffSegment - no preselection group found");
+  }
+
+  return presentations;
+};
+
+/**
+ * Process an ISOBMFF media segment buffer
+ * @param {ISOBoxer} parsedSegmentBuffer - The ISOBMFF segment buffer to process
+ * @param {number} activePresentationId - Presentation ID that should be selected for processing
+ * @returns {number|null} Presentation ID of enforced presentation
+ */
+const processIsoBmffMediaSegment = (parsedSegmentBuffer, activePresentationId) => {
+  // parse the segment that was just handed in
+  console.log(`ALPS::processIsoBmffSegment - processing moof media. ActivePresentation: ${activePresentationId}`);
+
+  // this is the data segment
+  // determine the offsets to all samples
+  const sampleOffsets = getSampleOffsets(parsedSegmentBuffer);
+
+  console.log(`ALPS::processIsoBmffSegment - obtained ${sampleOffsets.length} sample offsets`);
+
+  for (const sampleOffset of sampleOffsets) {
+    const sampleData = new DataView(parsedSegmentBuffer._raw.buffer, sampleOffset.offset, sampleOffset.size);
+    const parsedElements = parseTocElements(sampleData, elementsToParse);
+
+    if (parsedElements === null) {
+      console.log("ALPS::processIsobmffSegment - parsing error");
+      return null;
+    }
+
+    const payloadBaseMinus1 = parsedElements.find((element) => element.name === tocElements.PAYLOAD_BASE_MINUS1);
+    if (!payloadBaseMinus1) {
+      console.log("ALPS::processIsobmffSegment - payloadBaseMinus1 field not found, returning unmodified buffer");
+      return null;
+    }
+
+    let accumulatedShift = 0;
+    const byteAlignment = parsedElements.find((element) => element.name === tocElements.BYTE_ALIGNMENT);
+    if (byteAlignment) {
+      accumulatedShift = byteAlignment.width;
+    }
+
+    const ac4TocEnd = parsedElements.find((element) => element.name === tocElements.AC4_TOC_END);
+
+    // filter the table to produce a list of preselections complete with ID, a list of b_presentation_ids and a list of presentation_ids
+    const presentationOffsets = [];
+    const bPresentationIds = [];
+
+    parsedElements.forEach((element) => {
+      switch (element.name) {
+        case tocElements.PRESENTATION_LEVEL: {
+          presentationOffsets.push({ pos: element.pos, value: element.value, width: element.width });
+          break;
+        }
+        case tocElements.PRESENTATION_ID: {
+          const lastPresentationOffset = presentationOffsets[presentationOffsets.length - 1];
+
+          // modify last seen presentation. If there was none, this is an error:
+          // a presentation_id would always follow, never preceed, the level
+          if (presentationOffsets.length === 0) {
+            console.error("Encountered a presentationID without a presentation");
+          }
+          if (element.handler === "before_call") {
+            lastPresentationOffset.presentationIdPos = element.pos;
+          }
+          if (element.handler === "after_call") {
+            lastPresentationOffset.presentationId = element.value;
+            const width = element.pos - lastPresentationOffset.presentationIdPos;
+            lastPresentationOffset.presentationIdWidth = width;
+            accumulatedShift += width;
+          }
+          break;
+        }
+        case tocElements.B_PRESENTATION_ID: {
+          bPresentationIds.push(element);
+          break;
+        }
+        case tocElements.PAYLOAD_BASE_MINUS1:
+        case tocElements.BYTE_ALIGNMENT:
+        case tocElements.AC4_TOC_END: {
+          break;
+        }
+        default: {
+          console.error(`Unknown TOC parsed element: ${element.name}`);
+        }
+      }
+    });
+
+    // if there are less than 2 presentations in TOC - return unmodified buffer
+    if (presentationOffsets.length &lt; MINIMUM_PRESENTATIONS_AMOUNT) {
+      console.log("ALPS::processIsobmffSegment - less then 2 presentations found");
+      return null;
+    }
+
+    // check that all presentations carry an ID
+    if (presentationOffsets.some((presentation) => presentation.presentationId === undefined)) {
+      console.error("Not every presentation carries an ID");
+      return null;
+    }
+
+    if (presentationOffsets.every((offset) => offset.presentationId !== activePresentationId)) {
+      console.log("ALPS::processIsobmffSegment - activePresentationId not found in TOC");
+      return null;
+    }
+
+    // set presentation level to 7 for inactive presentations
+    presentationOffsets.forEach((presentation) => {
+      const presentationId = presentation.presentationId;
+
+      if (presentation.width !== PRESENTATION_LEVEL_WIDTH) {
+        console.warn(`Presentation level has unexpected width: ${presentation.width}`);
+      }
+
+      // in all presentations except the selected one, overwrite presentation level with "7"
+      if (activePresentationId !== presentationId) {
+        // updating inactive presentation with undecodable presentation level
+        setBits(sampleData, presentation.pos, presentation.width, UNDECODABLE_PRESENTATION_LEVEL);
+      }
+    });
+
+    // add available bytes to payload_base_minus1 (>>> is more efficient than Math.floor)
+    const availableAdditionalBytes = accumulatedShift >>> BITS_TO_SHIFT_TO_DIVIDE_BY_8;
+
+    // update payloadbase_minus_1
+    setBits(
+      sampleData,
+      payloadBaseMinus1.pos,
+      payloadBaseMinus1.width,
+      payloadBaseMinus1.value + availableAdditionalBytes,
+    );
+
+    // set all b_presentation_id fields to 0
+    bPresentationIds.forEach((bPresentationId) => {
+      setBits(sampleData, bPresentationId.pos, bPresentationId.width, 0);
+    });
+
+    // bit shifting
+    presentationOffsets
+      .slice()
+      .reverse()
+      .forEach((presentation) => {
+        const shiftWidth = ac4TocEnd.pos - presentation.presentationIdPos;
+        shiftLeft(sampleData, presentation.presentationIdPos, shiftWidth, presentation.presentationIdWidth);
+      });
+  }
+
+  console.log("ALPS::processIsoBmffSegment - done");
+
+  return activePresentationId;
+};
+
+export { processIsoBmffInitSegment, processIsoBmffMediaSegment };
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-ac4_toc_parser.html">ac4_toc_parser</a></li><li><a href="module-ac4_toc_parser_wrapper_bitsource.html">ac4_toc_parser_wrapper/bitsource</a></li><li><a href="module-ac4_toc_parser_wrapper_filtersink.html">ac4_toc_parser_wrapper/filtersink</a></li><li><a href="module-ac4_toc_parser_wrapper_index.html">ac4_toc_parser_wrapper/index</a></li><li><a href="module-alps.html">alps</a></li><li><a href="module-alps_core.html">alps_core</a></li><li><a href="module-bitwise_operations.html">bitwise_operations</a></li><li><a href="module-constants_isobmff_box_names.html">constants/isobmff_box_names</a></li><li><a href="module-constants_toc_elements.html">constants/toc_elements</a></li><li><a href="module-get_sample_offsets.html">get_sample_offsets</a></li><li><a href="module-types.html">types</a></li></ul><h3>Classes</h3><ul><li><a href="module-ac4_toc_parser_wrapper_bitsource.BitSource.html">BitSource</a></li><li><a href="module-ac4_toc_parser_wrapper_filtersink.FilterSink.html">FilterSink</a></li><li><a href="module-alps.Alps.html">Alps</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Dec 12 2025 11:49:27 GMT+0100 (Central European Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

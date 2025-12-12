@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2023-2024 by Dolby International AB.
+ *                Copyright (C) 2023-2025 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -39,6 +39,7 @@ const PRESENTATION_LEVEL_WIDTH = 3;
 const UNDECODABLE_PRESENTATION_LEVEL = 7;
 const BITS_TO_SHIFT_TO_DIVIDE_BY_8 = 3;
 const MINIMUM_PRESENTATIONS_AMOUNT = 2;
+const DIALOG_GAIN_ADJUSTMENT_FACTOR = 256;
 
 const elementsToParse = [
   tocElements.PRESENTATION_LEVEL,
@@ -50,20 +51,12 @@ const elementsToParse = [
 ];
 
 /**
- * Presentation entity.
- * @typedef {Object} Presentation
- * @property {number} id - id of presentation - preselection_tag from init segment and presentation_id in TOC
- * @property {string} label - label for presentation as read from isoBMFF box labl
- * @property {string} language - language tag as read from isoBMFF box elng
- */
-
-/**
  * Provides the core functionality of the library. It allows to process ISOBMFF segments and manage presentations.
  */
 /**
  * Process an ISOBMFF Init segment buffer
  * @param {ISOBoxer} parsedSegmentBuffer - The ISOBMFF segment buffer to process
- * @returns {Presentation[]} - List of presentations read from Init ISO BMFF Segment
+ * @returns {import('./types').Presentation[]} - List of presentations read from Init ISOBMFF Segment
  */
 const processIsoBmffInitSegment = (parsedSegmentBuffer) => {
   // parse the segment that was just handed in
@@ -76,31 +69,61 @@ const processIsoBmffInitSegment = (parsedSegmentBuffer) => {
   const presentations = [];
   const groupsList = meta && meta.boxes.find((box) => box.type === isoBmffBox.GROUPS_LIST);
   const preselectionGroups = groupsList && groupsList.boxes.filter((box) => box.type === isoBmffBox.PRESELECTION_GROUP);
-  const tracks = movie.boxes.filter((box) => box.type === isoBmffBox.TRACK);
-  const trackIds = tracks.map((track) => {
-    const trackHeader = track.boxes.find((box) => box.type === isoBmffBox.TRACK_HEADER);
-    return trackHeader.track_ID;
-  });
+  const tracks = movie && movie.boxes.filter((box) => box.type === isoBmffBox.TRACK);
+  const trackIds =
+    tracks?.map((track) => {
+      const trackHeader = track.boxes.find((box) => box.type === isoBmffBox.TRACK_HEADER);
+      return trackHeader.track_ID;
+    }) ?? [];
 
   if (Array.isArray(preselectionGroups)) {
     for (const preselectionGroup of preselectionGroups) {
       // filter out those preselection groups that reference tracks only from within this file
       // (that is, where every entity_ID is also the ID of a track in the file)
-      // and that have a preselection_tag set so that we reference to it
-      if (
-        preselectionGroup.entities.every((entity) => trackIds.includes(entity.entity_id)) &&
-        preselectionGroup.preselection_tag
-      ) {
-        const id = parseInt(preselectionGroup.preselection_tag, 10);
+      if (preselectionGroup.entities.every((entity) => trackIds.includes(entity.entity_id))) {
+        const parsedPreselectionTag = parseInt(preselectionGroup.preselection_tag, 10);
+        const id = isNaN(parsedPreselectionTag) ? null : parsedPreselectionTag;
 
-        const labelBox = preselectionGroup.boxes.find((box) => box.type === isoBmffBox.LABEL && !box.is_group_label);
-        const label = labelBox ? labelBox.label : undefined;
+        const selectionPriority = preselectionGroup.selection_priority ?? null;
+
+        const udtaBox = preselectionGroup.boxes.find((box) => box.type === isoBmffBox.USER_DATA);
+        const diapBox = udtaBox?.boxes.find((box) => box.type === isoBmffBox.DIALOG_PROCESSING);
+        const dialogGain = Number.isInteger(diapBox?.dialog_gain)
+          ? diapBox.dialog_gain / DIALOG_GAIN_ADJUSTMENT_FACTOR
+          : null;
 
         const languageBox = preselectionGroup.boxes.find((box) => box.type === isoBmffBox.EXTENDED_LANGUAGE_TAG);
-        const language = languageBox ? languageBox.extended_language : undefined;
+        const extendedLanguage = languageBox?.extended_language ?? null;
+
+        const audioRenderingIndicationBox = preselectionGroup.boxes.find(
+          (box) => box.type === isoBmffBox.AUDIO_RENDERING_INDICATION,
+        );
+        const audioRenderingIndication = audioRenderingIndicationBox?.audio_rendering_indication ?? null;
+
+        const labelBoxes = preselectionGroup.boxes.filter((box) => box.type === isoBmffBox.LABEL);
+        const labels = labelBoxes.map((labelBox) => ({
+          isGroupLabel: labelBox.is_group_label,
+          label: labelBox.label,
+          labelId: labelBox.label_id,
+          language: labelBox.language,
+        }));
+
+        const kindBoxes = preselectionGroup.boxes.filter((box) => box.type === isoBmffBox.KIND);
+        const kinds = kindBoxes.map((kindBox) => ({
+          schemeURI: kindBox.schemeURI,
+          value: kindBox.value,
+        }));
 
         // append parsed presentation object
-        presentations.push({ id, label, language });
+        presentations.push({
+          audioRenderingIndication,
+          dialogGain,
+          extendedLanguage,
+          id,
+          kinds,
+          labels,
+          selectionPriority,
+        });
       }
     }
   } else {
@@ -111,9 +134,10 @@ const processIsoBmffInitSegment = (parsedSegmentBuffer) => {
 };
 
 /**
- * Process an ISOBMFF segment buffer
+ * Process an ISOBMFF media segment buffer
  * @param {ISOBoxer} parsedSegmentBuffer - The ISOBMFF segment buffer to process
- * @returns {number|undefined} Presentation ID of enforced presentation
+ * @param {number} activePresentationId - Presentation ID that should be selected for processing
+ * @returns {number|null} Presentation ID of enforced presentation
  */
 const processIsoBmffMediaSegment = (parsedSegmentBuffer, activePresentationId) => {
   // parse the segment that was just handed in

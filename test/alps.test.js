@@ -1,3 +1,27 @@
+/************************************************************************************************************
+ *                Copyright (C) 2024-2025 by Dolby International AB.
+ *                All rights reserved.
+
+ * Redistribution and use in source and binary forms, with or without modification, are permitted
+ * provided that the following conditions are met:
+
+ * 1. Redistributions of source code must retain the above copyright notice, this list of conditions
+ *    and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions
+ *    and the following disclaimer in the documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or
+ *    promote products derived from this software without specific prior written permission.
+
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE.
+ ************************************************************************************************************/
+
 import { Alps } from "../src/alps.js";
 import fs from "fs";
 
@@ -8,6 +32,7 @@ describe("#Alps", () => {
     let alps;
 
     const originalBuffer = fs.readFileSync(`${__dirname}/examples/test_seg.m4s`);
+    const bufferWithSelectedPresentationId0 = fs.readFileSync(`${__dirname}/examples/test_seg_0.m4s`);
     const bufferWithSelectedPresentationId1 = fs.readFileSync(`${__dirname}/examples/test_seg_1.m4s`);
     const bufferWithSelectedPresentationId2 = fs.readFileSync(`${__dirname}/examples/test_seg_2.m4s`);
 
@@ -22,6 +47,12 @@ describe("#Alps", () => {
       });
 
       describe("activePresentationId in process param", () => {
+        it("should change the Segment buffer to buffer with selected presentation id 0 if passed 0 as activePresentationId", () => {
+          const buffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/test_seg.m4s`)).buffer;
+          alps.processIsoBmffSegment(buffer, undefined, 0);
+          expect(Buffer.from(buffer, 0)).toEqual(bufferWithSelectedPresentationId0);
+        });
+
         it("should change the Segment buffer to buffer with selected presentation id 1 if passed 1 as activePresentationId", () => {
           const buffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/test_seg.m4s`)).buffer;
           alps.processIsoBmffSegment(buffer, undefined, 1);
@@ -78,6 +109,12 @@ describe("#Alps", () => {
           buffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/test_seg.m4s`)).buffer;
           alps.processIsoBmffSegment(buffer, first_period, 2);
           expect(Buffer.from(buffer, 0)).toEqual(bufferWithSelectedPresentationId2);
+        });
+
+        it("param with active 0 should take precedence and change buffer to presentation 0", () => {
+          const buffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/test_seg.m4s`)).buffer;
+          alps.processIsoBmffSegment(buffer, first_period, 0);
+          expect(Buffer.from(buffer, 0)).toEqual(bufferWithSelectedPresentationId0);
         });
 
         it("param with active 2 should take precedence and change buffer to presentation 2", () => {

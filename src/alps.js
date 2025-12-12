@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2023-2024 by Dolby International AB.
+ *                Copyright (C) 2023-2025 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -26,7 +26,7 @@
 
 /**
  * @module
- * @desc The main entry point for the Alps library. This file exports the `Alps` class, which provides the core functionality of the library.
+ * @desc The main entry point for the ALPS library. This file exports the `Alps` class, which provides the core functionality of the library.
  */
 
 import * as isoBmffBox from "./constants/isobmff_box_names.js";
@@ -40,15 +40,21 @@ const SEGMENT_TYPES = {
   MEDIA: "media",
 };
 
+/* eslint-disable */
+ISOBoxer.addBoxProcessor("diap", function () {
+  this._procFullBox();
+  this._procField("dialog_gain", "int", 16);
+});
+/* eslint-enable */
+
 /**
- * This callback is called when list of presentations changes, eg. new init segment is processed for multi-period dash contents.
- *
+ * This callback is called when list of presentations changes, e.g. new init segment is processed for multi-period DASH contents.
  * @callback presentationsChangedCallback
  * @param {PresentationsChangedEvent} event
  */
 
 /**
- * PresentationsChanged event object
+ * Event data for presentationsChangedCallback
  * @typedef {Object} PresentationsChangedEvent
  * @property {string|null} streamId - ID of the stream for which the presentations were parsed
  */
@@ -56,31 +62,49 @@ const SEGMENT_TYPES = {
 /**
  * ALPS Data for stream
  * @typedef {Object} Stream
- * @property {Presentation[]} presentations - presentation related to the stream
+ * @property {import('./types.js').Presentation[]} presentations - presentation related to the stream
  * @property {number|undefined} activePresentationId - current active presentation ID for the stream
  */
 
 /**
- * Presentation entity.
- * @typedef {Object} Presentation
- * @property {number} id - id of presentation - preselection_tag from init segment and presentation_id in TOC
- * @property {string} label - label for presentation as read from isoBMFF box labl
- * @property {string} language - language tag as read from isoBMFF box elng
+ * Buffer processing result for init segment.
+ * @typedef {Object} ProcessIsoBmffInitSegmentResult
+ * @property {"init"} segmentType - "init" indicating that segment is an init segment
+ * @property {import('./types.js').Presentation[]} presentations - list of presentations read from ISOBMFF init segment
+ * @property {null} forcedPresentationId - always null for init segments
+ */
+
+/**
+ * Buffer processing result for media segment.
+ * @typedef {Object} ProcessIsoBmffMediaSegmentResult
+ * @property {"media"} segmentType - "media" indicating that segment is a media segment
+ * @property {null} presentations - null for media segments
+ * @property {number|null} forcedPresentationId - ID of presentation selected in bitstream, null when no presentation was selected
+ */
+
+/**
+ * Buffer processing result for unknown segment.
+ * @typedef {Object} ProcessIsoBmffUnknownSegmentResult
+ * @property {null} segmentType - null indicating that segment type is unknown
+ * @property {null} presentations - null for unknown segments
+ * @property {null} forcedPresentationId - null for unknown segments
  */
 
 /**
  * Buffer processing result.
- * @typedef {Object} ProcessIsoBmffSegmentResult
- * @property {string} segmentType - type of detected segment "init" or "media"
- * @property {Presentation[]|null} presentations - data returned only for "init" segment, list of presentations read from init segment isobmff
- * @property {number|null} forcedPresentationId - data returned only for "media" segment, ID of presentation selected for playback, null when no presentation was selected
+ * @typedef {ProcessIsoBmffInitSegmentResult|ProcessIsoBmffMediaSegmentResult|ProcessIsoBmffUnknownSegmentResult} ProcessIsoBmffSegmentResult
  */
+
+// Export shared types
+export * from "./types.js";
 
 /**
  * Provides the core functionality of the library. It allows to process ISOBMFF segments and manage presentations.
  */
 export class Alps {
+  /** @type {Record<string,Stream>} */
   #streams = {};
+  /** @type {presentationsChangedCallback|undefined} */
   #presentationsChangedEventHandler;
 
   #initializeStream(streamId) {
@@ -98,7 +122,7 @@ export class Alps {
 
   /**
    * Get presentation and activePresentationId for all streams
-   * @returns {Stream[]} Data for all streams present in current ALPS state
+   * @returns {Record<string,Stream>} Data for all streams present in current ALPS state
    */
   getStreams() {
     return this.#streams;
@@ -106,7 +130,7 @@ export class Alps {
 
   /**
    * Clear data for unused stream
-   * @param {string|null} streamId Stream Id which should be deleted
+   * @param {string|null} streamId Stream ID which should be deleted, null for non-multi-period use
    */
   clearStream(streamId = null) {
     delete this.#streams[streamId];
@@ -123,8 +147,8 @@ export class Alps {
 
   /**
    * Get the list of available presentations
-   * @param {string|null} streamId The ID of the stream
-   * @returns {Presentation[]} An array of presentation objects containing id, label, and language properties
+   * @param {string|null} streamId The ID of the stream, null for non-multi-period use
+   * @returns {import('./types.js').Presentation[]} An array of presentation objects
    */
   getPresentations(streamId = null) {
     this.#initializeStream(streamId);
@@ -136,8 +160,8 @@ export class Alps {
 
   /**
    * Get the ID of the currently active presentation
-   * @param {string|null} streamId The ID of the stream
-   * @returns {number|undefined} The ID of the active presentation or -1 if no presentation is set
+   * @param {string|null} streamId The ID of the stream, null for non-multi-period use
+   * @returns {number|undefined} The ID of the active presentation, -1 if no presentation is set, undefined if no stream data exists
    */
   getActivePresentationId(streamId = null) {
     console.log(`ALPS::getActivePresentation - activePresentation: ${this.#streams[streamId]?.activePresentationId}`);
@@ -146,8 +170,8 @@ export class Alps {
 
   /**
    * Set the ID of the active presentation
-   * @param {number|undefined} presentationId - The ID of the presentation to set as active or -1 to select the default presentation
-   * @param {string|null} streamId The ID of the stream
+   * @param {number|undefined} presentationId - The ID of the presentation to set as active, -1 to select the default presentation or undefined to clear any active presentation
+   * @param {string|null} streamId The ID of the stream, null for non-multi-period use
    */
   setActivePresentationId(presentationId, streamId = null) {
     console.log(`ALPS::setActivePresentation - new activePresentation: ${presentationId}`);
@@ -158,8 +182,8 @@ export class Alps {
   /**
    * Process an ISOBMFF segment buffer
    * @param {ArrayBuffer} segmentBuffer - The ISOBMFF segment buffer to process
-   * @param {string|null} streamId - Stream ID for Segment buffer
-   * @param {number|undefined} activePresentationId - Forced presentation ID that should be selected for processing, use -1 for TV default, and leave undefined to use value set by setActivePresentationId, this parameter takes precedence over this.activePresentationId
+   * @param {string|null} streamId - Stream ID for Segment buffer, null for non-multi-period use
+   * @param {number|undefined} activePresentationId - Forced presentation ID that should be selected for processing, use -1 for TV default, and leave undefined to use value set by setActivePresentationId. This parameter takes precedence over this.activePresentationId
    * @returns {ProcessIsoBmffSegmentResult} Data retrieved from processed segment
    */
   processIsoBmffSegment(segmentBuffer, streamId = null, activePresentationId = undefined) {
@@ -193,7 +217,7 @@ export class Alps {
     if (movieFragment) {
       forcedPresentationId = processIsoBmffMediaSegment(
         parsedSegmentBuffer,
-        activePresentationId || stream.activePresentationId,
+        activePresentationId ?? stream.activePresentationId,
       );
       segmentType = SEGMENT_TYPES.MEDIA;
     }

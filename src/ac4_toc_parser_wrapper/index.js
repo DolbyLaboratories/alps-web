@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2023-2024 by Dolby International AB.
+ *                Copyright (C) 2023-2025 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -58,7 +58,7 @@ const parseTocElements = (data, elements) => {
       if (index < data.byteLength) {
         return { value: data.getUint8(index), done: ++index >= data.byteLength };
       }
-      return { done: true };
+      return { value: undefined, done: true };
     },
   };
 

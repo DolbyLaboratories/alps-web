@@ -2,7 +2,7 @@
   "name": "@oei/alps",
   "main": "dist/alps.bundle.min.js",
   "types": "dist/alps.d.ts",
-  "version": "1.1.0-alpha",
+  "version": "2.0.0",
   "type": "module",
   "description": "reference application-level presentation selection implementation",
   "keywords": [
@@ -25,10 +25,10 @@
   "scripts": {
     "build": "esbuild src/alps.js --bundle --format=esm --drop:console --drop:debugger --sourcemap --target=chrome58,firefox57,safari11,edge16 --outfile=dist/alps.bundle.js",
     "build:production": "esbuild src/alps.js --bundle --format=esm --minify --drop:console --drop:debugger --target=chrome58,firefox57,safari11,edge16 --outfile=dist/alps.bundle.min.js && npm run types",
-    "types": "tsc src/alps.js -d --emitDeclarationOnly --allowJs --skipLibCheck --outDir .temp && mv .temp/alps.d.ts dist && rm -r .temp",
+    "types": "tsc src/alps.js -d --emitDeclarationOnly --allowJs --skipLibCheck --outDir .temp && mv .temp/alps.d.ts .temp/types.d.ts dist && rm -r .temp",
     "test": "jest",
     "lint": "eslint",
-    "docs": "jsdoc -d docs src/* README.md"
+    "docs": "jsdoc -c ./jsdoc.config.json -d docs/html src/* README.md"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.24.7",
@@ -43,6 +43,7 @@
     "eslint-plugin-prettier": "^5.2.1",
     "jest": "^29.7.0",
     "jsdoc": "^4.0.4",
+    "jsdoc-tsimport-plugin": "^1.0.5",
     "semantic-release": "^24.0.0",
     "ts-jest": "^29.1.5",
     "typescript": "^5.9.2"

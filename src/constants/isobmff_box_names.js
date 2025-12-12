@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2024 by Dolby International AB.
+ *                Copyright (C) 2023-2025 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -61,12 +61,32 @@ export const PRESELECTION_GROUP = "prsl";
  * @constant
  * @type {string}
  */
+export const USER_DATA = "udta";
+/**
+ * @constant
+ * @type {string}
+ */
+export const DIALOG_PROCESSING = "diap";
+/**
+ * @constant
+ * @type {string}
+ */
 export const EXTENDED_LANGUAGE_TAG = "elng";
 /**
  * @constant
  * @type {string}
  */
+export const AUDIO_RENDERING_INDICATION = "ardi";
+/**
+ * @constant
+ * @type {string}
+ */
 export const LABEL = "labl";
+/**
+ * @constant
+ * @type {string}
+ */
+export const KIND = "kind";
 /**
  * @constant
  * @type {string}
