@@ -144,6 +144,175 @@
     
 
     
+    <h4 class="name" id="~rev"><span class="type-signature">(inner) </span>rev<span class="signature">(byte)</span><span class="type-signature"> &rarr; {number}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Reverses the bit order of a single byte using a parallel bit-swap technique.
+Each step swaps groups of bits at halving granularity:
+  1. swap the two nibbles  (4-bit groups)
+  2. swap 2-bit pairs      (2-bit groups)
+  3. swap adjacent bits    (1-bit groups)
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>byte</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">An unsigned byte value (0–255)</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="bitwise_operations.js.html">bitwise_operations.js</a>, <a href="bitwise_operations.js.html#line46">line 46</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The byte with its bits reversed
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">number</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>rev(0b10000000) // → 0b00000001 (1)
+rev(0b10110001) // → 0b10001101 (141)</code></pre>
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="~setBits"><span class="type-signature">(inner) </span>setBits<span class="signature">(data, offset, width, value)</span><span class="type-signature"></span></h4>
     
 
@@ -316,7 +485,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="bitwise_operations.js.html">bitwise_operations.js</a>, <a href="bitwise_operations.js.html#line108">line 108</a>
+        <a href="bitwise_operations.js.html">bitwise_operations.js</a>, <a href="bitwise_operations.js.html#line181">line 181</a>
     </li></ul></dd>
     
 
@@ -535,7 +704,7 @@ Zeros are pushed in from the right side to maintain width.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="bitwise_operations.js.html">bitwise_operations.js</a>, <a href="bitwise_operations.js.html#line51">line 51</a>
+        <a href="bitwise_operations.js.html">bitwise_operations.js</a>, <a href="bitwise_operations.js.html#line75">line 75</a>
     </li></ul></dd>
     
 
@@ -597,6 +766,247 @@ shiftLeft(dataView, 3, 3, 3)
 
 
         
+            
+
+    
+
+    
+    <h4 class="name" id="~shiftRight"><span class="type-signature">(inner) </span>shiftRight<span class="signature">(data, offset, width, shift)</span><span class="type-signature"> &rarr; {DataView}</span></h4>
+    
+
+    
+    <p class="summary">Shifts a range of bits within a byte array right by a specified amount.</p>
+    
+
+
+
+<div class="description">
+    Shifts the specified range of bits right without shifting bits outside the range.
+Zeros are pushed in from the left side to maintain width.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">DataView</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The byte array containing the bits to shift</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>offset</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The start index of the bit range to shift (must be >= 0)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>width</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The number of bits to shift (must be >= 0)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>shift</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The number of positions to shift right (must be >= 0)</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="bitwise_operations.js.html">bitwise_operations.js</a>, <a href="bitwise_operations.js.html#line130">line 130</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The same byte array with the bits shifted in-place
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">DataView</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const arrayBuffer = new ArrayBuffer(1);
+const dataView = new DataView(arrayBuffer);
+dataView.setUint8(0, 0b01011101);
+shiftRight(dataView, 3, 3, 2);
+// Only bits 5,4,3 = '111' are shifted right by 2 → become '001'
+// Result: 0b01000101</code></pre>
+
+
+
+        
     
 
     
@@ -618,7 +1028,7 @@ shiftLeft(dataView, 3, 3, 3)
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Dec 12 2025 11:49:27 GMT+0100 (Central European Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Jul 03 2026 11:14:53 GMT+0200 (Central European Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>

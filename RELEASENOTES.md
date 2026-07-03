@@ -1,3 +1,16 @@
+# 3.0.0
+
+This release includes the following changes since the 2.0.0
+
+### Bug Fixes
+
+- Handle payload base over 5 bits
+- Change dialog_gain field size and resolution
+
+### BREAKING CHANGES
+
+- This update breaks compatibility with streams using 16 bit ISOBMFF Dialog Gain signalling
+
 # 2.0.0
 
 This release includes the following changes since the 1.0.0

@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2023-2025 by Dolby International AB.
+ *                Copyright (C) 2023-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -31,7 +31,7 @@
 
 import * as isoBmffBox from "./constants/isobmff_box_names.js";
 import * as tocElements from "./constants/toc_elements.js";
-import { setBits, shiftLeft } from "./bitwise_operations.js";
+import { setBits, shiftLeft, shiftRight } from "./bitwise_operations.js";
 import { getSampleOffsets } from "./get_sample_offsets.js";
 import { parseTocElements } from "./ac4_toc_parser_wrapper/index.js";
 
@@ -39,7 +39,17 @@ const PRESENTATION_LEVEL_WIDTH = 3;
 const UNDECODABLE_PRESENTATION_LEVEL = 7;
 const BITS_TO_SHIFT_TO_DIVIDE_BY_8 = 3;
 const MINIMUM_PRESENTATIONS_AMOUNT = 2;
-const DIALOG_GAIN_ADJUSTMENT_FACTOR = 256;
+const DIALOG_GAIN_ADJUSTMENT_FACTOR = 2;
+// The write path for the extended payload_base encoding inserts a single
+// F_variable_bits(3) round (3 bits + b_read_more=0), which encodes values 0–7,
+// giving an effective payload_base range of 32–39. Values >= 40 would require
+// a second round which this implementation does not support.
+const MAX_PAYLOAD_BASE = 39;
+const PAYLOAD_BASE_EXTENDED_THRESHOLD = 31;
+const PAYLOAD_BASE_MINUS1_FIELD_WIDTH = 5;
+const PAYLOAD_BASE_EXTENSION_WIDTH = 3;
+const PAYLOAD_BASE_EXTENSION_RANGE_START = 32;
+const VARIABLE_BITS_CONTINUE_SIZE = 1;
 
 const elementsToParse = [
   tocElements.PRESENTATION_LEVEL,
@@ -48,11 +58,9 @@ const elementsToParse = [
   tocElements.PAYLOAD_BASE_MINUS1,
   tocElements.BYTE_ALIGNMENT,
   tocElements.AC4_TOC_END,
+  tocElements.PAYLOAD_BASE,
 ];
 
-/**
- * Provides the core functionality of the library. It allows to process ISOBMFF segments and manage presentations.
- */
 /**
  * Process an ISOBMFF Init segment buffer
  * @param {ISOBoxer} parsedSegmentBuffer - The ISOBMFF segment buffer to process
@@ -164,6 +172,12 @@ const processIsoBmffMediaSegment = (parsedSegmentBuffer, activePresentationId) =
       return null;
     }
 
+    let payloadBase = parsedElements.find((element) => element.name === tocElements.PAYLOAD_BASE)?.value;
+    if (!payloadBase) {
+      console.log("ALPS::processIsobmffSegment - payloadBase field not found");
+      payloadBase = payloadBaseMinus1.value + 1;
+    }
+
     let accumulatedShift = 0;
     const byteAlignment = parsedElements.find((element) => element.name === tocElements.BYTE_ALIGNMENT);
     if (byteAlignment) {
@@ -206,6 +220,7 @@ const processIsoBmffMediaSegment = (parsedSegmentBuffer, activePresentationId) =
           break;
         }
         case tocElements.PAYLOAD_BASE_MINUS1:
+        case tocElements.PAYLOAD_BASE:
         case tocElements.BYTE_ALIGNMENT:
         case tocElements.AC4_TOC_END: {
           break;
@@ -233,6 +248,30 @@ const processIsoBmffMediaSegment = (parsedSegmentBuffer, activePresentationId) =
       return null;
     }
 
+    // add available bytes to payload_base_minus1 (>>> is more efficient than Math.floor)
+    const availableAdditionalBytes = accumulatedShift >>> BITS_TO_SHIFT_TO_DIVIDE_BY_8;
+    const newPayloadBase = payloadBase + availableAdditionalBytes;
+
+    if (newPayloadBase > MAX_PAYLOAD_BASE) {
+      console.error(
+        `ALPS::processIsoBmffMediaSegment - newPayloadBase (${newPayloadBase}) exceeds the maximum supported value of ${MAX_PAYLOAD_BASE}`,
+      );
+      return null;
+    }
+
+    if (newPayloadBase > PAYLOAD_BASE_EXTENDED_THRESHOLD && payloadBase <= PAYLOAD_BASE_EXTENDED_THRESHOLD) {
+      const newAccumulatedShift = accumulatedShift - (PAYLOAD_BASE_EXTENSION_WIDTH + VARIABLE_BITS_CONTINUE_SIZE);
+      const newAvailableAdditionalBytes = newAccumulatedShift >>> BITS_TO_SHIFT_TO_DIVIDE_BY_8;
+      const newPayloadBaseAfterShift = payloadBase + newAvailableAdditionalBytes;
+
+      if (newPayloadBaseAfterShift <= PAYLOAD_BASE_EXTENDED_THRESHOLD) {
+        console.error(
+          `ALPS::processIsoBmffMediaSegment - inserting the 4-bit payload_base extension header reduces available shift such that extended encoding is no longer required (adjusted newPayloadBase=${newPayloadBaseAfterShift}); this indicates a stream conformance error`,
+        );
+        return null;
+      }
+    }
+
     // set presentation level to 7 for inactive presentations
     presentationOffsets.forEach((presentation) => {
       const presentationId = presentation.presentationId;
@@ -248,17 +287,6 @@ const processIsoBmffMediaSegment = (parsedSegmentBuffer, activePresentationId) =
       }
     });
 
-    // add available bytes to payload_base_minus1 (>>> is more efficient than Math.floor)
-    const availableAdditionalBytes = accumulatedShift >>> BITS_TO_SHIFT_TO_DIVIDE_BY_8;
-
-    // update payloadbase_minus_1
-    setBits(
-      sampleData,
-      payloadBaseMinus1.pos,
-      payloadBaseMinus1.width,
-      payloadBaseMinus1.value + availableAdditionalBytes,
-    );
-
     // set all b_presentation_id fields to 0
     bPresentationIds.forEach((bPresentationId) => {
       setBits(sampleData, bPresentationId.pos, bPresentationId.width, 0);
@@ -272,6 +300,48 @@ const processIsoBmffMediaSegment = (parsedSegmentBuffer, activePresentationId) =
         const shiftWidth = ac4TocEnd.pos - presentation.presentationIdPos;
         shiftLeft(sampleData, presentation.presentationIdPos, shiftWidth, presentation.presentationIdWidth);
       });
+
+    // update payloadbase_minus_1
+    if (newPayloadBase <= PAYLOAD_BASE_EXTENDED_THRESHOLD) {
+      setBits(
+        sampleData,
+        payloadBaseMinus1.pos,
+        payloadBaseMinus1.width,
+        payloadBaseMinus1.value + availableAdditionalBytes,
+      );
+    } else if (payloadBase > PAYLOAD_BASE_EXTENDED_THRESHOLD) {
+      setBits(
+        sampleData,
+        payloadBaseMinus1.pos + PAYLOAD_BASE_MINUS1_FIELD_WIDTH,
+        PAYLOAD_BASE_EXTENSION_WIDTH,
+        newPayloadBase - PAYLOAD_BASE_EXTENSION_RANGE_START,
+      );
+    } else {
+      const newAccumulatedShift = accumulatedShift - (PAYLOAD_BASE_EXTENSION_WIDTH + VARIABLE_BITS_CONTINUE_SIZE);
+      const newAvailableAdditionalBytes = newAccumulatedShift >>> BITS_TO_SHIFT_TO_DIVIDE_BY_8;
+      const newPayloadBaseAfterShift = payloadBase + newAvailableAdditionalBytes;
+
+      const shiftWidth = ac4TocEnd.pos - payloadBaseMinus1.pos;
+      shiftRight(
+        sampleData,
+        payloadBaseMinus1.pos,
+        shiftWidth,
+        PAYLOAD_BASE_EXTENSION_WIDTH + VARIABLE_BITS_CONTINUE_SIZE,
+      );
+      setBits(sampleData, payloadBaseMinus1.pos, payloadBaseMinus1.width, PAYLOAD_BASE_EXTENDED_THRESHOLD);
+      setBits(
+        sampleData,
+        payloadBaseMinus1.pos + PAYLOAD_BASE_MINUS1_FIELD_WIDTH,
+        PAYLOAD_BASE_EXTENSION_WIDTH,
+        newPayloadBaseAfterShift - PAYLOAD_BASE_EXTENSION_RANGE_START,
+      );
+      setBits(
+        sampleData,
+        payloadBaseMinus1.pos + PAYLOAD_BASE_MINUS1_FIELD_WIDTH + PAYLOAD_BASE_EXTENSION_WIDTH,
+        VARIABLE_BITS_CONTINUE_SIZE,
+        0,
+      );
+    }
   }
 
   console.log("ALPS::processIsoBmffSegment - done");

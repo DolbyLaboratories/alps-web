@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2024-2025 by Dolby International AB.
+ *                Copyright (C) 2024-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -39,7 +39,14 @@ describe("#Parser", () => {
   });
 
   describe("Sink callbacks validation", () => {
-    const whitelist = new Set(["before_call", "after_call", "after_position", "write_uint", "write_align"]);
+    const whitelist = new Set([
+      "before_call",
+      "after_call",
+      "after_add",
+      "after_position",
+      "write_uint",
+      "write_align",
+    ]);
     const regex = /this\.BAM_sink\.([a-zA-Z0-9_]+)\s*\(/g;
 
     it("should use all callbacks from whitelist", () => {

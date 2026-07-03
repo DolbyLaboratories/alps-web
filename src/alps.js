@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2023-2025 by Dolby International AB.
+ *                Copyright (C) 2023-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -43,7 +43,7 @@ const SEGMENT_TYPES = {
 /* eslint-disable */
 ISOBoxer.addBoxProcessor("diap", function () {
   this._procFullBox();
-  this._procField("dialog_gain", "int", 16);
+  this._procField("dialog_gain", "int", 8);
 });
 /* eslint-enable */
 

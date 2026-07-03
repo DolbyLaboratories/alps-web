@@ -27,7 +27,7 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>/************************************************************************************************************
- *                Copyright (C) 2023-2024 by Dolby International AB.
+ *                Copyright (C) 2023-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -150,13 +150,13 @@ export class Parser
     BAM_g_table17 = {0: 1, 1: 2};
     BAM_g_table18 = [5, 6, 7, 8, 9];
     BAM_g_table19 = [10, 11, 12];
-
+    
     constructor (BAM_source, BAM_sink)
     {
         this.BAM_source = BAM_source;
         this.BAM_sink = BAM_sink;
     }
-
+    
     F_channel_mode_contains_LFE (cm)
     {
         {
@@ -170,11 +170,11 @@ export class Parser
             }
         }
     }
-
+    
     F_bitrate_indicator ()
     {
-        var bi;
         var factor;
+        var bi;
         {
             {
                 bi = this.BAM_source.get("", 3);
@@ -206,15 +206,15 @@ export class Parser
             }
         }
     }
-
+    
     F_content_type ()
     {
-        var b_serialized_language_tag;
-        var n_language_tag_bytes;
-        var language_tag_chunk;
-        var language_tag_bytes;
-        var b_language_indicator;
         var b_start_tag;
+        var b_serialized_language_tag;
+        var b_language_indicator;
+        var language_tag_chunk;
+        var n_language_tag_bytes;
+        var language_tag_bytes;
         {
             {
                 this.content_classifier = this.BAM_source.get("", 3);
@@ -264,22 +264,22 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_substream_info_chan (asio_group_index, asio_gs_index, asio_b_substreams_present_chan)
     {
-        var substream_index;
-        var b_sf_multiplier;
-        var b_bitrate_info;
         var si_ch_mode;
-        var si_channel_mode;
         var top_channels_present;
-        var b_4_back_channels_present;
         var si_b_iframe;
+        var si_channel_mode;
+        var b_bitrate_info;
+        var b_sf_multiplier;
         var b_center_present;
+        var add_ch_base;
+        var b_4_back_channels_present;
+        var sf_multiplier;
+        var substream_index;
         var b_lfe = null;
         var b_lfe;
-        var sf_multiplier;
-        var add_ch_base;
         {
             {
                 this.F_define_channel_modes();
@@ -463,7 +463,7 @@ export class Parser
             }
         }
     }
-
+    
     F_channel_mode ()
     {
         var value;
@@ -550,21 +550,21 @@ export class Parser
             return value;
         }
     }
-
+    
     F_ac4_substream_info (si_b_associated, si_b_dialog, si_ps_index)
     {
-        var substream_index;
+        var sf_multiplier;
+        var b_associated_content;
         var si_b_iframe;
-        var b_sf_multiplier;
-        var b_bitrate_info;
-        var b_dialog_content;
         var si_channel_mode;
+        var b_bitrate_info;
+        var b_sf_multiplier;
+        var b_dialog_content;
+        var b_content_type;
+        var add_ch_base;
+        var substream_index;
         var b_lfe = null;
         var b_lfe;
-        var sf_multiplier;
-        var add_ch_base;
-        var b_associated_content;
-        var b_content_type;
         {
             {
                 this.F_define_channel_modes();
@@ -792,13 +792,13 @@ export class Parser
             }
         }
     }
-
+    
     F_emdf_protection ()
     {
-        var protection_bits_secondary;
-        var protection_length_secondary;
-        var protection_length_primary;
         var protection_bits_primary;
+        var protection_length_secondary;
+        var protection_bits_secondary;
+        var protection_length_primary;
         {
             {
                 protection_length_primary = this.BAM_source.get("", 2);
@@ -867,7 +867,7 @@ export class Parser
             }
         }
     }
-
+    
     F_emdf_info ()
     {
         var key_id;
@@ -927,7 +927,7 @@ export class Parser
             }
         }
     }
-
+    
     F_emdf_payloads_substream_info (toc_i)
     {
         var substream_index;
@@ -962,7 +962,7 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_hsf_ext_substream_info (ahsf_b_substreams_present)
     {
         var substream_index;
@@ -1015,20 +1015,20 @@ export class Parser
             }
         }
     }
-
+    
     F_oamd_common_data ()
     {
-        var add_data_bits;
-        var ocd_p1;
-        var add_data;
-        var ocd_p0;
-        var bits_used;
-        var b_bed_object_chan_distribute;
-        var master_screen_size_ratio;
         var add_data_bytes_minus1;
         var add_data_bytes;
         var b_additional_data;
+        var bits_used;
+        var ocd_p1;
+        var master_screen_size_ratio;
+        var add_data;
+        var b_bed_object_chan_distribute;
+        var add_data_bits;
         var b_default_screen_size_ratio;
+        var ocd_p0;
         {
             {
                 b_default_screen_size_ratio = this.BAM_source.get("", 1);
@@ -1101,7 +1101,7 @@ export class Parser
             }
         }
     }
-
+    
     F_define_oamd ()
     {
         var NUM_TRIM_CONFIGS;
@@ -1123,26 +1123,26 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_substream_info_ajoc (asio_group_index, asio_gs_index_ajoc, asio_b_substreams_present)
     {
-        var n_fullband_upmix_signals_minus1;
-        var substream_index;
         var b_oamd_common_data_present;
-        var b_sf_multiplier;
-        var b_bitrate_info;
-        var n_fullband_dmx_signals;
-        var n_fullband_upmix_signals;
         var si_b_iframe;
+        var b_sf_multiplier;
+        var si_channel_mode_j;
+        var b_bitrate_info;
+        var sf_multiplier;
+        var n_fullband_upmix_signals_minus1;
+        var b_static_dmx;
+        var n_fullband_dmx_signals;
+        var n_fullband_dmx_signals_minus1;
+        var n_fullband_upmix_signals;
         var num_objects_DYNAMIC = null;
         var num_objects_DYNAMIC;
+        var substream_index;
         var ajoc_b_lfe;
-        var n_fullband_dmx_signals_minus1;
         var b_lfe = null;
         var b_lfe;
-        var si_channel_mode_j;
-        var b_static_dmx;
-        var sf_multiplier;
         {
             {
                 num_objects_DYNAMIC = this.BAM_g_table6.slice(0);
@@ -1331,7 +1331,7 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_sgi_specifier (asgi_b_associated, asgi_b_dialog, group_in_presentation_index)
     {
         var group_index;
@@ -1395,21 +1395,21 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_substream_group_info (si_group_index)
     {
-        var obj_index;
-        var b_dialog_content;
+        var b_channel_coded;
+        var sus_ver;
+        var b_ajoc;
         var sus;
+        var b_dialog_content;
+        var n_lf_substreams_minus2;
+        var obj_index;
+        var b_associated_content;
+        var b_oamd_substream;
         var n_lf_substreams;
         var b_substreams_present;
-        var b_channel_coded;
-        var b_ajoc;
-        var n_lf_substreams_minus2;
-        var sus_ver;
-        var b_oamd_substream;
         var b_content_type;
-        var b_associated_content;
         {
             {
                 b_substreams_present = this.BAM_source.get("", 1);
@@ -1675,11 +1675,11 @@ export class Parser
             }
         }
     }
-
+    
     F_oamd_substream_info (oamd_b_substreams_present)
     {
-        var substream_index;
         var b_iframe_oamd;
+        var substream_index;
         {
             {
                 this.F_define_oamd();
@@ -1736,35 +1736,35 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_substream_info_obj (asio_group_index, asio_gs_index, asio_gs_index_obj, asio_b_substreams_present)
     {
-        var obj_type;
-        var b_nonstd_bed_channel_assignment;
-        var res_bytes;
-        var b_bed_start;
-        var bed_chan_assign_code;
-        var j;
+        var si_b_lfe;
         var si_b_iframe;
-        var n_objs;
-        var si_num_channels;
         var reserved_data;
-        var b_isf_start;
         var n_objects_code;
-        var isf_config;
-        var substream_index;
+        var b_isf_start;
         var b_sf_multiplier;
-        var b_bed_objects;
-        var b_dynamic_objects;
-        var b_bitrate_info;
-        var b_isf;
-        var nonstd_bed_channel_assignment_mask;
+        var obj_type;
+        var b_bed_start;
+        var j;
+        var isf_config;
+        var n_objs;
+        var res_bytes;
         var b_ch_assign_code;
+        var b_dynamic_objects;
+        var std_bed_channel_assignment_mask;
+        var nonstd_bed_channel_assignment_mask;
+        var b_bitrate_info;
+        var b_bed_objects;
+        var bed_chan_assign_code;
+        var sf_multiplier;
+        var si_num_channels;
+        var b_isf;
+        var b_nonstd_bed_channel_assignment;
+        var substream_index;
         var b_lfe = null;
         var b_lfe;
-        var std_bed_channel_assignment_mask;
-        var sf_multiplier;
-        var si_b_lfe;
         {
             {
                 n_objs = 0;
@@ -2103,26 +2103,26 @@ export class Parser
             }
         }
     }
-
+    
     F_bed_dyn_obj_assignment (n_signals, b_upmix, bd_lfe)
     {
-        var n_isf;
-        var isf_config;
-        var oc_num_channels;
-        var obj_type;
-        var n_bed_signals_minus1;
-        var b_nonstd_bed_channel_assignment;
-        var nonstd_bed_channel_assignment;
-        var bed_chan_assign_code;
-        var nonstd_bed_channel_assignment_mask;
-        var lfe_signalled;
-        var b_is_isf;
-        var n_bed_signals;
-        var bed_ch_bits;
         var b_ch_assign_code;
-        var std_bed_channel_assignment_mask;
-        var b_dyn_objects_only;
         var b_chan_assign_mask;
+        var std_bed_channel_assignment_mask;
+        var lfe_signalled;
+        var nonstd_bed_channel_assignment_mask;
+        var obj_type;
+        var b_is_isf;
+        var n_isf;
+        var bed_ch_bits;
+        var b_dyn_objects_only;
+        var nonstd_bed_channel_assignment;
+        var isf_config;
+        var bed_chan_assign_code;
+        var oc_num_channels;
+        var n_bed_signals_minus1;
+        var n_bed_signals;
+        var b_nonstd_bed_channel_assignment;
         var b;
         {
             {
@@ -2294,14 +2294,14 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_presentation_substream_info (aps_presentation_version)
     {
+        var b_alternative;
+        var b_iframe_pres;
         var substream_index;
         var b_lfe = null;
         var b_lfe;
-        var b_alternative;
-        var b_iframe_pres;
         {
             {
                 b_alternative = this.BAM_source.get("", 1);
@@ -2349,11 +2349,11 @@ export class Parser
             }
         }
     }
-
+    
     F_presentation_version ()
     {
-        var val;
         var b_tmp;
+        var val;
         {
             {
                 val = 0;
@@ -2377,7 +2377,7 @@ export class Parser
             return val;
         }
     }
-
+    
     F_get_ch_mode (cm)
     {
         {
@@ -2481,7 +2481,7 @@ export class Parser
             return this.n;
         }
     }
-
+    
     F_presentation_config_ext_info ()
     {
         {
@@ -2570,19 +2570,19 @@ export class Parser
             }
         }
     }
-
+    
     F_define_channel_modes ()
     {
-        var CHANNEL_MODE_7X_34 = null;
-        var CHANNEL_MODE_7X_34;
-        var CHANNEL_MODE_7X_322 = null;
-        var CHANNEL_MODE_7X_322;
-        var CHANNEL_MODE_7X = null;
-        var CHANNEL_MODE_7X;
         var CHANNEL_MODE_7X_52 = null;
         var CHANNEL_MODE_7X_52;
         var CHANNEL_MODE_5X = null;
         var CHANNEL_MODE_5X;
+        var CHANNEL_MODE_7X_34 = null;
+        var CHANNEL_MODE_7X_34;
+        var CHANNEL_MODE_7X = null;
+        var CHANNEL_MODE_7X;
+        var CHANNEL_MODE_7X_322 = null;
+        var CHANNEL_MODE_7X_322;
         {
             {
                 this.CHANNEL_MODE_MONO = 0;
@@ -2649,7 +2649,7 @@ export class Parser
             }
         }
     }
-
+    
     F_channel_mode_to_ch_mode (cm)
     {
         {
@@ -2726,11 +2726,11 @@ export class Parser
             }
         }
     }
-
+    
     F_variable_bits (n_bits)
     {
-        var read;
         var value;
+        var read;
         var b_read_more;
         {
             {
@@ -2769,12 +2769,12 @@ export class Parser
             return value;
         }
     }
-
+    
     F_raw_ac4_frame_toc_only ()
     {
-        var ac4_toc_end;
-        var ac4_toc_begin;
         var frame_len_base;
+        var ac4_toc_begin;
+        var ac4_toc_end;
         {
             {
                 ac4_toc_begin = this.BAM_g_position;
@@ -2791,7 +2791,7 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_presentation_info ()
     {
         {
@@ -3035,19 +3035,19 @@ export class Parser
             }
         }
     }
-
+    
     F_substream_index_table ()
     {
-        var b_size_present;
         var substream_type = null;
         var substream_type;
+        var b_size_present;
+        var n_substreams;
         var b_substream_type_known = null;
         var b_substream_type_known;
         var substream_size = null;
         var substream_size;
-        var n_substreams;
-        var s;
         var b_more_bits;
+        var s;
         {
             {
                 n_substreams = this.BAM_source.get("", 2);
@@ -3161,7 +3161,7 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_presentation_v2_info (apv_toc_i)
     {
         {
@@ -3453,7 +3453,7 @@ export class Parser
             }
         }
     }
-
+    
     F_frame_size ()
     {
         var frame_size;
@@ -3471,24 +3471,24 @@ export class Parser
             }
         }
     }
-
+    
     F_ac4_toc ()
     {
-        var b_wait_frames;
-        var payload_base_minus1;
-        var n_presentations;
-        var wait_frames;
-        var b_payload_base;
-        var program_uuid;
-        var total_n_substream_groups;
         var payload_base;
+        var program_uuid;
+        var b_wait_frames;
         var b_program_uuid_present;
-        var b_single_presentation;
-        var b_iframe_global;
-        var sequence_counter;
-        var b_program_id;
-        var b_more_presentations;
+        var b_payload_base;
         var short_program_id;
+        var payload_base_minus1;
+        var sequence_counter;
+        var wait_frames;
+        var b_iframe_global;
+        var b_more_presentations;
+        var total_n_substream_groups;
+        var n_presentations;
+        var b_program_id;
+        var b_single_presentation;
         {
             {
                 this.bitstream_version = this.BAM_source.get("", 2);
@@ -3623,6 +3623,7 @@ export class Parser
                             }
                             {
                                 payload_base += this.v;
+                                this.BAM_sink.after_add("payload_base", payload_base);
                             }
                         }
                     }
@@ -3717,7 +3718,7 @@ export class Parser
             }
         }
     }
-
+    
     F_get_num_channels (cm)
     {
         {
@@ -3821,11 +3822,11 @@ export class Parser
             return this.n;
         }
     }
-
+    
     F_frame_rate_multiply_info ()
     {
-        var multiplier_bit;
         var b_multiplier;
+        var multiplier_bit;
         {
             if ((this.BAM_g_table14.slice(0).indexOf(this.frame_rate_index) >= 0))
             {
@@ -3877,12 +3878,12 @@ export class Parser
             }
         }
     }
-
+    
     F_frame_rate_fractions_info ()
     {
-        var b_frame_rate_fraction_is_4;
-        var frame_rate_fraction;
         var b_frame_rate_fraction;
+        var frame_rate_fraction;
+        var b_frame_rate_fraction_is_4;
         {
             {
                 frame_rate_fraction = 1;
@@ -3955,7 +3956,7 @@ export default Parser;
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Dec 12 2025 11:49:27 GMT+0100 (Central European Standard Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Jul 03 2026 11:14:53 GMT+0200 (Central European Summer Time)
 </footer>
 
 <script> prettyPrint(); </script>

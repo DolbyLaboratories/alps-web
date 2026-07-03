@@ -1,8 +1,11 @@
 {
-  "name": "@oei/alps",
+  "name": "@dolbylaboratories/alps",
   "main": "dist/alps.bundle.min.js",
   "types": "dist/alps.d.ts",
-  "version": "2.0.0",
+  "version": "3.0.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "description": "reference application-level presentation selection implementation",
   "keywords": [
@@ -12,7 +15,7 @@
     "personalization",
     "flexstream"
   ],
-  "homepage": "https://gitlab-sfo.dolby.net/oei/alps",
+  "homepage": "https://github.com/DolbyLaboratories/alps-web",
   "license": "BSD-3-Clause",
   "author": "Wolfgang Schildbach <wschi@dolby.com>",
   "files": [
@@ -20,10 +23,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://gitlab-sfo.dolby.net/oei/alps.git"
+    "url": "https://github.com/DolbyLaboratories/alps-web.git"
   },
   "scripts": {
-    "build": "esbuild src/alps.js --bundle --format=esm --drop:console --drop:debugger --sourcemap --target=chrome58,firefox57,safari11,edge16 --outfile=dist/alps.bundle.js",
+    "build": "esbuild src/alps.js --bundle --format=esm --drop:debugger --sourcemap --target=chrome58,firefox57,safari11,edge16 --outfile=dist/alps.bundle.js",
     "build:production": "esbuild src/alps.js --bundle --format=esm --minify --drop:console --drop:debugger --target=chrome58,firefox57,safari11,edge16 --outfile=dist/alps.bundle.min.js && npm run types",
     "types": "tsc src/alps.js -d --emitDeclarationOnly --allowJs --skipLibCheck --outDir .temp && mv .temp/alps.d.ts .temp/types.d.ts dist && rm -r .temp",
     "test": "jest",

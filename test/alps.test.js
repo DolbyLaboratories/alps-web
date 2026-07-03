@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2024-2025 by Dolby International AB.
+ *                Copyright (C) 2024-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -208,6 +208,129 @@ describe("#Alps", () => {
         const buffer = new Uint8Array(fs.readFileSync("./test/examples/test_seg.m4s")).buffer;
         alps.processIsoBmffSegment(buffer);
         expect(Buffer.from(buffer, 0)).not.toEqual(originalSegment);
+      });
+    });
+
+    describe("PayloadBase update scenarios", () => {
+      /**
+       * Byte offset within test_seg_pb*.m4s at which the first sample begins.
+       * Derived by inspecting test_seg.m4s (moof._offset=0, sampleStart=456).
+       */
+      const SAMPLE_START = 456;
+
+      /**
+       * Read `width` bits (MSB first) from an ArrayBuffer starting at the bit
+       * position `sampleBitPos` relative to the sample start.
+       *
+       * @param {ArrayBuffer} buffer
+       * @param {number} sampleBitPos  Bit offset within the first sample
+       * @param {number} width         Number of bits to read
+       * @returns {number}
+       */
+      const readSampleBits = (buffer, sampleBitPos, width) => {
+        const view = new DataView(buffer);
+        let value = 0;
+        for (let i = 0; i < width; i++) {
+          const absPos = SAMPLE_START * 8 + sampleBitPos + i;
+          const byteIdx = absPos >> 3;
+          const bitShift = 7 - (absPos & 7);
+          value = (value << 1) | ((view.getUint8(byteIdx) >> bitShift) & 1);
+        }
+        return value;
+      };
+
+      /**
+       * Bit position (within the sample) of the 5-bit payload_base_minus1 field.
+       * When pbm1 == 31 the three-bit F_variable_bits(3) extension immediately follows
+       * at bit EXT_BIT_OFFSET.
+       */
+      const PBM1_BIT_OFFSET = 30;
+      const EXT_BIT_OFFSET = 35;
+
+      /** availableAdditionalBytes = accumulatedShift(19) >>> 3 = 2 for all test_seg_pb*.m4s fixtures. */
+      const AVAILABLE_ADDITIONAL_BYTES = 2;
+
+      let alps;
+      beforeEach(() => {
+        alps = new Alps();
+        const initBuffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/test_init.mp4`)).buffer;
+        alps.processIsoBmffSegment(initBuffer);
+      });
+
+      describe("branch: newPayloadBase <= 31 (setBits on pbm1 only)", () => {
+        // payload_base_minus1 value at bit 30–34 is simply incremented by availableAdditionalBytes.
+        it.each([
+          // [fixture,             origPayloadBase, expectedPbm1InOutput]
+          ["test_seg.m4s", 1, 1 + AVAILABLE_ADDITIONAL_BYTES - 1], // newPB=3,  pbm1=2
+          ["test_seg_pb29.m4s", 29, 29 + AVAILABLE_ADDITIONAL_BYTES - 1], // newPB=31, pbm1=30
+        ])("%s (payloadBase=%i): pbm1 field should be %i after processing", (filename, _origPB, expectedPbm1) => {
+          const buffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/${filename}`)).buffer;
+          const result = alps.processIsoBmffSegment(buffer, undefined, 0);
+
+          expect(result.forcedPresentationId).toBe(0);
+          expect(readSampleBits(buffer, PBM1_BIT_OFFSET, 5)).toBe(expectedPbm1);
+        });
+      });
+
+      describe("branch: payloadBase <= 31 → newPayloadBase > 31 → newNewPayloadBase <= 31 (overflow guard)", () => {
+        // newPayloadBaseAfterShift = origPB + floor((accumulatedShift − 3) / 8) = origPB + 2
+        it.each([["test_seg_pb30.m4s", 30]])(
+          "%s (payloadBase=%i): pbm1 → 31 and ext → %i after processing",
+          (filename, _origPB) => {
+            const buffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/${filename}`)).buffer;
+            const result = alps.processIsoBmffSegment(buffer, undefined, 0);
+
+            expect(result.forcedPresentationId).toBe(null);
+            expect(readSampleBits(buffer, PBM1_BIT_OFFSET, 5)).toBe(_origPB - 1);
+          },
+        );
+      });
+
+      describe("branch: payloadBase <= 31 → newPayloadBase > 31 (shiftRight + extension)", () => {
+        // After shiftRight(pos=30, width, 3) the two-byte payload_base field expands:
+        //   bits 30–34 → pbm1 = 31
+        //   bits 35–37 → F_variable_bits(3) extension = newPayloadBaseAfterShift − 32
+        // newPayloadBaseAfterShift = origPB + floor((accumulatedShift − 3) / 8) = origPB + 2
+        it.each([
+          // [fixture,            origPayloadBase, expectedExt]
+          ["test_seg_pb31.m4s", 31, 31 + AVAILABLE_ADDITIONAL_BYTES - 32 - 1], // newPBAfterShift=33, ext=1
+        ])("%s (payloadBase=%i): pbm1 → 31 and ext → %i after processing", (filename, _origPB, expectedExt) => {
+          const buffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/${filename}`)).buffer;
+          const result = alps.processIsoBmffSegment(buffer, undefined, 0);
+
+          expect(result.forcedPresentationId).toBe(0);
+          expect(readSampleBits(buffer, PBM1_BIT_OFFSET, 5)).toBe(31);
+          expect(readSampleBits(buffer, EXT_BIT_OFFSET, 3)).toBe(expectedExt);
+          expect(readSampleBits(buffer, EXT_BIT_OFFSET + 3, 1)).toBe(0);
+        });
+      });
+
+      describe("branch: payloadBase > 31 (setBits on extension field only)", () => {
+        // pbm1 stays 31; only the 3-bit extension at bit 35 is updated.
+        // newPayloadBase = origPB + availableAdditionalBytes, ext = newPB − 32.
+        it.each([
+          // [fixture,            origPayloadBase, expectedExt]
+          ["test_seg_pb32.m4s", 32, 32 + AVAILABLE_ADDITIONAL_BYTES - 32], // newPB=34, ext=2
+          ["test_seg_pb37.m4s", 37, 37 + AVAILABLE_ADDITIONAL_BYTES - 32], // newPB=39, ext=7
+        ])("%s (payloadBase=%i): pbm1 stays 31 and ext → %i after processing", (filename, _origPB, expectedExt) => {
+          const buffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/${filename}`)).buffer;
+          const result = alps.processIsoBmffSegment(buffer, undefined, 0);
+
+          expect(result.forcedPresentationId).toBe(0);
+          expect(readSampleBits(buffer, PBM1_BIT_OFFSET, 5)).toBe(31);
+          expect(readSampleBits(buffer, EXT_BIT_OFFSET, 3)).toBe(expectedExt);
+          expect(readSampleBits(buffer, EXT_BIT_OFFSET + 3, 1)).toBe(0);
+        });
+      });
+
+      describe("branch: newPayloadBase > 39 (overflow guard)", () => {
+        // payloadBase=38 → newPB=40 exceeds the maximum of 39; processing must abort.
+        it("test_seg_pb38.m4s (payloadBase=38): processIsoBmffSegment should return forcedPresentationId=null", () => {
+          const buffer = new Uint8Array(fs.readFileSync(`${__dirname}/examples/test_seg_pb38.m4s`)).buffer;
+          const result = alps.processIsoBmffSegment(buffer, undefined, 0);
+
+          expect(result.forcedPresentationId).toBeNull();
+        });
       });
     });
   });

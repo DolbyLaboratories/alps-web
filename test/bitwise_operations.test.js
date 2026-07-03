@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2024-2025 by Dolby International AB.
+ *                Copyright (C) 2024-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -22,10 +22,26 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  ************************************************************************************************************/
 
-import { shiftLeft, setBits } from "../src/bitwise_operations.js";
+import { rev, shiftLeft, shiftRight, setBits } from "../src/bitwise_operations.js";
 
 describe("BitwiseOperations", () => {
   let dataView;
+
+  describe(".rev", () => {
+    test.each([
+      [0b00000000, 0b00000000],
+      [0b11111111, 0b11111111],
+      [0b10000000, 0b00000001],
+      [0b00000001, 0b10000000],
+      [0b10101010, 0b01010101],
+      [0b01010101, 0b10101010],
+      [0b11110000, 0b00001111],
+      [0b00001111, 0b11110000],
+      [0b10110001, 0b10001101],
+    ])("rev(0b%b) should equal 0b%b", (input, expected) => {
+      expect(rev(input)).toBe(expected);
+    });
+  });
 
   describe(".shiftLeft", () => {
     describe("Given bits: 00000001", () => {
@@ -234,6 +250,300 @@ describe("BitwiseOperations", () => {
       test.todo("should log an error and not modify the data when width is exceeding data view");
 
       test.todo("should log an error and not modify the data when shift is negative");
+    });
+
+    describe("Large shift values (shiftAcc overflow boundary)", () => {
+      // These cases require BigInt accumulation: JS Number << truncates to 32-bit
+      // signed, so shift >= 25 corrupts carries via sign-extension in >>= 8,
+      // and shift >= 32 silently wraps (x << 32 === x in Number arithmetic).
+
+      describe("Given 4 bytes: FF FF FF FF", () => {
+        beforeEach(() => {
+          const buf = new ArrayBuffer(4);
+          dataView = new DataView(buf);
+          for (let i = 0; i < 4; i++) dataView.setUint8(i, 0xff);
+        });
+
+        describe("When offset=0, width=32, shift=25", () => {
+          test("Should change bits to: FE 00 00 00", () => {
+            shiftLeft(dataView, 0, 32, 25);
+            expect(dataView.getUint8(0)).toBe(0xfe);
+            expect(dataView.getUint8(1)).toBe(0x00);
+            expect(dataView.getUint8(2)).toBe(0x00);
+            expect(dataView.getUint8(3)).toBe(0x00);
+          });
+        });
+      });
+
+      describe("Given 5 bytes: FF FF FF FF FF", () => {
+        beforeEach(() => {
+          const buf = new ArrayBuffer(5);
+          dataView = new DataView(buf);
+          for (let i = 0; i < 5; i++) dataView.setUint8(i, 0xff);
+        });
+
+        describe("When offset=0, width=40, shift=32", () => {
+          test("Should change bits to: FF 00 00 00 00", () => {
+            shiftLeft(dataView, 0, 40, 32);
+            expect(dataView.getUint8(0)).toBe(0xff);
+            expect(dataView.getUint8(1)).toBe(0x00);
+            expect(dataView.getUint8(2)).toBe(0x00);
+            expect(dataView.getUint8(3)).toBe(0x00);
+            expect(dataView.getUint8(4)).toBe(0x00);
+          });
+        });
+      });
+    });
+  });
+
+  describe(".shiftRight", () => {
+    let dataView;
+
+    describe("Given bits: 00000001", () => {
+      beforeEach(() => {
+        const arrayBuffer = new ArrayBuffer(1);
+        dataView = new DataView(arrayBuffer);
+        dataView.setUint8(0, 0b00000001);
+      });
+
+      describe("When offset=7", () => {
+        const offset = 7;
+        describe("When width=1", () => {
+          const width = 1;
+          describe("When shift=1", () => {
+            const shift = 1;
+            test("Should shift the single bit right, but it falls off → becomes 0", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b00000000);
+            });
+          });
+        });
+      });
+    });
+
+    describe("Given bits: 10101010 01010101 11110000", () => {
+      beforeEach(() => {
+        const arrayBuffer = new ArrayBuffer(3);
+        dataView = new DataView(arrayBuffer);
+        dataView.setUint8(0, 0b10101010);
+        dataView.setUint8(1, 0b01010101);
+        dataView.setUint8(2, 0b11110000);
+      });
+
+      describe("When offset=-1", () => {
+        const offset = -1;
+        describe("When width=1", () => {
+          const width = 1;
+          describe("When shift=1", () => {
+            const shift = 1;
+            test("Should throw RangeError", () => {
+              const t = () => {
+                shiftRight(dataView, offset, width, shift);
+              };
+              expect(t).toThrow(RangeError);
+              expect(t).toThrow("Offset is outside the bounds of the DataView");
+            });
+          });
+        });
+      });
+
+      describe("When offset=0", () => {
+        const offset = 0;
+        describe("When width=0", () => {
+          const width = 0;
+          describe("When shift=3", () => {
+            const shift = 3;
+            test("Should not change bits", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b10101010);
+              expect(dataView.getUint8(1)).toBe(0b01010101);
+              expect(dataView.getUint8(2)).toBe(0b11110000);
+            });
+          });
+        });
+
+        describe("When width=1", () => {
+          const width = 1;
+          describe("When shift=1", () => {
+            const shift = 1;
+            test("Should change bits to: 00101010 01010101 11110000", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b00101010);
+              expect(dataView.getUint8(1)).toBe(0b01010101);
+              expect(dataView.getUint8(2)).toBe(0b11110000);
+            });
+          });
+        });
+
+        describe("When width=24", () => {
+          const width = 24;
+          describe("When shift=0", () => {
+            const shift = 0;
+            test("Should not change bits", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b10101010);
+              expect(dataView.getUint8(1)).toBe(0b01010101);
+              expect(dataView.getUint8(2)).toBe(0b11110000);
+            });
+          });
+
+          describe("When shift=1", () => {
+            const shift = 1;
+            test("Should change bits to: 01010101 00101010 11111000", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b01010101);
+              expect(dataView.getUint8(1)).toBe(0b00101010);
+              expect(dataView.getUint8(2)).toBe(0b11111000);
+            });
+          });
+        });
+      });
+
+      describe("When offset=1", () => {
+        const offset = 1;
+        describe("When width=4", () => {
+          const width = 4;
+          describe("When shift=3", () => {
+            const shift = 3;
+            test("Should change bits to: 10000010 01010101 11110000", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b10000010);
+              expect(dataView.getUint8(1)).toBe(0b01010101);
+              expect(dataView.getUint8(2)).toBe(0b11110000);
+            });
+          });
+        });
+      });
+
+      describe("When offset=4", () => {
+        const offset = 4;
+        describe("When width=1", () => {
+          const width = 1;
+          describe("When shift=1", () => {
+            const shift = 1;
+            test("Should change bits to: 10100010 01010101 11110000", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b10100010);
+              expect(dataView.getUint8(1)).toBe(0b01010101);
+              expect(dataView.getUint8(2)).toBe(0b11110000);
+            });
+          });
+
+          describe("When shift=5", () => {
+            const shift = 5;
+            test("Should change bits to: 10100010 01010101 11110000", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b10100010);
+              expect(dataView.getUint8(1)).toBe(0b01010101);
+              expect(dataView.getUint8(2)).toBe(0b11110000);
+            });
+          });
+        });
+
+        describe("When width=8", () => {
+          const width = 8;
+          describe("When shift=7", () => {
+            const shift = 7;
+            test("Should change bits to: 10100000 00010101 11110000", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b10100000);
+              expect(dataView.getUint8(1)).toBe(0b00010101);
+              expect(dataView.getUint8(2)).toBe(0b11110000);
+            });
+          });
+        });
+
+        describe("When width=16", () => {
+          const width = 16;
+          describe("When shift=7", () => {
+            const shift = 7;
+            test("Should change bits to: 10100000 00010101 01010000", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b10100000);
+              expect(dataView.getUint8(1)).toBe(0b00010100);
+              expect(dataView.getUint8(2)).toBe(0b10100000);
+            });
+          });
+        });
+      });
+
+      describe("When offset=23", () => {
+        const offset = 23;
+        describe("When width=1", () => {
+          const width = 1;
+          describe("When shift=1", () => {
+            const shift = 1;
+            test("Should change bits to: 10101010 01010101 11110000", () => {
+              shiftRight(dataView, offset, width, shift);
+              expect(dataView.getUint8(0)).toBe(0b10101010);
+              expect(dataView.getUint8(1)).toBe(0b01010101);
+              expect(dataView.getUint8(2)).toBe(0b11110000);
+            });
+          });
+        });
+      });
+
+      describe("When offset=24", () => {
+        const offset = 24;
+        describe("When width=1", () => {
+          const width = 1;
+          describe("When shift=1", () => {
+            const shift = 1;
+            test("Should throw RangeError", () => {
+              const t = () => {
+                shiftRight(dataView, offset, width, shift);
+              };
+              expect(t).toThrow(RangeError);
+              expect(t).toThrow("Offset is outside the bounds of the DataView");
+            });
+          });
+        });
+      });
+
+      test.todo("should log an error and not modify the data when width is negative");
+
+      test.todo("should log an error and not modify the data when width is exceeding data view");
+
+      test.todo("should log an error and not modify the data when shift is negative");
+    });
+
+    describe("Large shift values (shiftAcc overflow boundary)", () => {
+      describe("Given 4 bytes: FF FF FF FF", () => {
+        beforeEach(() => {
+          const buf = new ArrayBuffer(4);
+          dataView = new DataView(buf);
+          for (let i = 0; i < 4; i++) dataView.setUint8(i, 0xff);
+        });
+
+        describe("When offset=0, width=32, shift=25", () => {
+          test("Should change bits to: 00 00 00 7F", () => {
+            shiftRight(dataView, 0, 32, 25);
+            expect(dataView.getUint8(0)).toBe(0x00);
+            expect(dataView.getUint8(1)).toBe(0x00);
+            expect(dataView.getUint8(2)).toBe(0x00);
+            expect(dataView.getUint8(3)).toBe(0x7f);
+          });
+        });
+      });
+
+      describe("Given 5 bytes: FF FF FF FF FF", () => {
+        beforeEach(() => {
+          const buf = new ArrayBuffer(5);
+          dataView = new DataView(buf);
+          for (let i = 0; i < 5; i++) dataView.setUint8(i, 0xff);
+        });
+
+        describe("When offset=0, width=40, shift=32", () => {
+          test("Should change bits to: 00 00 00 00 FF", () => {
+            shiftRight(dataView, 0, 40, 32);
+            expect(dataView.getUint8(0)).toBe(0x00);
+            expect(dataView.getUint8(1)).toBe(0x00);
+            expect(dataView.getUint8(2)).toBe(0x00);
+            expect(dataView.getUint8(3)).toBe(0x00);
+            expect(dataView.getUint8(4)).toBe(0xff);
+          });
+        });
+      });
     });
   });
 

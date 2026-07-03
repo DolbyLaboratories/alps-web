@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2024-2025 by Dolby International AB.
+ *                Copyright (C) 2024-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -48,9 +48,12 @@ export default [
       "prefer-destructuring": "off",
       camelcase: [
         "error",
-        { allow: ["after_call", "after_position", "before_call", "get_align", "write_align", "write_uint"] },
+        {
+          allow: ["after_add", "after_call", "after_position", "before_call", "get_align", "write_align", "write_uint"],
+        },
       ],
       // TODO
+      "max-lines": "off",
       "max-statements": "off",
       "max-params": "off",
       "max-lines-per-function": "off",

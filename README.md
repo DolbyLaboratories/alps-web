@@ -17,24 +17,7 @@ ALPS (Application Layer Presentation Selection) enables selection of a presentat
 
 To install the package:
 
-1. Clone the repository
-
-   `git clone git@github.com:DolbyLaboratories/alps-web.git`
-
-2. Install the dependencies
-
-   `npm i`
-
-3. Build the package
-
-   `npm run build:production`
-
-4. Copy the build files to your codebase, e.g. upload to directory libs/alps.
-
-   To simplify import syntax and enable TypeScript support:
-
-   - rename <i>alps.bundle.min.js</i> to <i>index.js</i>
-   - rename <i>alps.d.ts</i> to <i>index.d.ts</i>.
+ `npm install --save @dolbylaboratories/alps`
 
 ## Quickstart
 

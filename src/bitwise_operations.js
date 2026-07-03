@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2024 by Dolby International AB.
+ *                Copyright (C) 2024-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -30,6 +30,30 @@
  */
 
 /**
+ * Reverses the bit order of a single byte using a parallel bit-swap technique.
+ * Each step swaps groups of bits at halving granularity:
+ *   1. swap the two nibbles  (4-bit groups)
+ *   2. swap 2-bit pairs      (2-bit groups)
+ *   3. swap adjacent bits    (1-bit groups)
+ *
+ * @param {number} byte - An unsigned byte value (0–255)
+ * @returns {number} The byte with its bits reversed
+ *
+ * @example
+ * rev(0b10000000) // → 0b00000001 (1)
+ * rev(0b10110001) // → 0b10001101 (141)
+ */
+const rev = (byte) => {
+  // swap nibbles
+  let result = ((byte & 0xf0) >>> 4) | ((byte & 0x0f) << 4);
+  // swap bit pairs
+  result = ((result & 0xcc) >>> 2) | ((result & 0x33) << 2);
+  // swap adjacent bits
+  result = ((result & 0xaa) >>> 1) | ((result & 0x55) << 1);
+  return result;
+};
+
+/**
  * Shifts the specified range of bits left without shifting bits outside the range.
  * Zeros are pushed in from the right side to maintain width.
  *
@@ -49,40 +73,89 @@
  * // dataView = [0b01000001]
  */
 const shiftLeft = (data, offset, width, shift) => {
-  // Calculate start and end byte and bit indexes
+  if (width === 0) return data;
+
   const startByte = offset >> 3;
   const endByte = (offset + width - 1) >> 3;
-  const startBit = offset & 7;
-  const endBit = (offset + width - 1) & 7;
+  const startMask = 0xff >> (offset & 7);
+  const endMask = (0xff << (7 - ((offset + width - 1) & 7))) & 0xff;
 
-  // Calculate bitmasks for start and end bytes
-  const startMask = 0b11111111 >> startBit;
-  const endMask = (0b11111111 << (7 - endBit)) & 0b11111111;
-
-  // Accumulator for shifted bits across byte boundaries
+  // For shift < 24 the accumulator stays below 2^31 so plain bitwise << and
+  // unsigned >>> are exact.  For shift >= 24 we fall back to IEEE-754 double
+  // multiplication which is exact up to 2^53.
+  const useBitwise = shift < 24;
+  const shiftMul = useBitwise ? 0 : 2 ** shift;
   let shiftAcc = 0;
 
-  // Iterate bytes from end to start
+  // Iterate end→start: carry propagates naturally from LSB side toward MSB.
   for (let i = endByte; i >= startByte; i--) {
-    // Get byte and mask
-    const currByte = data.getUint8(i);
-    let mask = 0b11111111;
-    if (i === startByte) {
-      mask &= startMask;
-    }
-    if (i === endByte) {
-      mask &= endMask;
-    }
+    let mask = 0xff;
+    if (i === startByte) mask &= startMask;
+    if (i === endByte) mask &= endMask;
 
-    // Apply mask and shift
-    const clearedByte = currByte & ~mask;
-    const maskedCurrByte = currByte & mask;
-    shiftAcc = (maskedCurrByte << shift) + shiftAcc;
-    const shiftedCurrByte = clearedByte | (shiftAcc & 0b11111111 & mask);
-    shiftAcc >>= 8;
+    const byte = data.getUint8(i);
+    if (useBitwise) {
+      shiftAcc = ((byte & mask) << shift) + shiftAcc;
+      data.setUint8(i, (byte & ~mask) | (shiftAcc & 0xff & mask));
+      shiftAcc >>>= 8;
+    } else {
+      shiftAcc = (byte & mask) * shiftMul + shiftAcc;
+      data.setUint8(i, (byte & ~mask) | (shiftAcc % 256 & mask));
+      shiftAcc = Math.trunc(shiftAcc / 256);
+    }
+  }
+  return data;
+};
 
-    // Store shifted result
-    data.setUint8(i, shiftedCurrByte);
+/**
+ * Shifts the specified range of bits right without shifting bits outside the range.
+ * Zeros are pushed in from the left side to maintain width.
+ *
+ * @summary Shifts a range of bits within a byte array right by a specified amount.
+ *
+ * @param {DataView} data - The byte array containing the bits to shift
+ * @param {number} offset - The start index of the bit range to shift (must be >= 0)
+ * @param {number} width - The number of bits to shift (must be >= 0)
+ * @param {number} shift - The number of positions to shift right (must be >= 0)
+ * @returns {DataView} The same byte array with the bits shifted in-place
+ *
+ * @example
+ * const arrayBuffer = new ArrayBuffer(1);
+ * const dataView = new DataView(arrayBuffer);
+ * dataView.setUint8(0, 0b01011101);
+ * shiftRight(dataView, 3, 3, 2);
+ * // Only bits 5,4,3 = '111' are shifted right by 2 → become '001'
+ * // Result: 0b01000101
+ */
+const shiftRight = (data, offset, width, shift) => {
+  if (width === 0) return data;
+
+  const startByte = offset >> 3;
+  const endByte = (offset + width - 1) >> 3;
+  const startMask = 0xff >> (offset & 7);
+  const endMask = (0xff << (7 - ((offset + width - 1) & 7))) & 0xff;
+
+  // Same fast/slow split as shiftLeft; rev() mirrors the carry direction.
+  const useBitwise = shift < 24;
+  const shiftMul = useBitwise ? 0 : 2 ** shift;
+  let shiftAcc = 0;
+
+  // Iterate start→end: rev() maps MSB carry into LSB carry for the reversed bytes.
+  for (let i = startByte; i <= endByte; i++) {
+    let mask = 0xff;
+    if (i === startByte) mask &= startMask;
+    if (i === endByte) mask &= endMask;
+
+    const byte = data.getUint8(i);
+    if (useBitwise) {
+      shiftAcc = (rev(byte & mask) << shift) + shiftAcc;
+      data.setUint8(i, (byte & ~mask) | (rev(shiftAcc & 0xff) & mask));
+      shiftAcc >>>= 8;
+    } else {
+      shiftAcc = rev(byte & mask) * shiftMul + shiftAcc;
+      data.setUint8(i, (byte & ~mask) | (rev(shiftAcc % 256) & mask));
+      shiftAcc = Math.trunc(shiftAcc / 256);
+    }
   }
   return data;
 };
@@ -130,4 +203,4 @@ const setBits = (data, offset, width, value) => {
   data.setUint8(byteOffset + 1, word & 0xff);
 };
 
-export { shiftLeft, setBits };
+export { rev, shiftLeft, shiftRight, setBits };

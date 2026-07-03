@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2023-2025 by Dolby International AB.
+ *                Copyright (C) 2023-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -110,6 +110,18 @@ export class FilterSink {
   after_position(name, position) {
     if (this.elements.includes(name)) {
       this.callback(name, null, null, position, "after_position");
+    }
+  }
+
+  /**
+   * Called after a derived/computed value is assigned to a variable (e.g. when
+   * `payload_base` is extended beyond the initial 5-bit field).
+   * @param {string} name - name of the AC-4 TOC element
+   * @param {number} value - final computed value of the element
+   */
+  after_add(name, value) {
+    if (this.elements.includes(name)) {
+      this.callback(name, value, null, null, "after_add");
     }
   }
 }

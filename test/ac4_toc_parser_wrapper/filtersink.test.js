@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2025 by Dolby International AB.
+ *                Copyright (C) 2025-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -142,6 +142,30 @@ describe("#FilterSink", () => {
 
     it("should not call the callback if the element (variable) should not be filtered", () => {
       filterSink.after_position("this_should_not_be_filtered", 2);
+
+      expect(callbackResult).toEqual(null);
+    });
+  });
+
+  describe(".after_add", () => {
+    it("should call the callback with the computed value if the element should be filtered", () => {
+      filterSink.elements.push(tocElements.PAYLOAD_BASE);
+
+      filterSink.after_add(tocElements.PAYLOAD_BASE, 35);
+
+      expect(callbackResult).toEqual({
+        name: tocElements.PAYLOAD_BASE,
+        value: 35,
+        width: null,
+        position: null,
+        handler: "after_add",
+      });
+
+      filterSink.elements.pop();
+    });
+
+    it("should not call the callback if the element should not be filtered", () => {
+      filterSink.after_add("this_should_not_be_filtered", 35);
 
       expect(callbackResult).toEqual(null);
     });

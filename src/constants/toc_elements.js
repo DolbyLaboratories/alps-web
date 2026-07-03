@@ -1,5 +1,5 @@
 /************************************************************************************************************
- *                Copyright (C) 2023-2024 by Dolby International AB.
+ *                Copyright (C) 2023-2026 by Dolby International AB.
  *                All rights reserved.
 
  * Redistribution and use in source and binary forms, with or without modification, are permitted
@@ -57,3 +57,9 @@ export const BYTE_ALIGNMENT = "byte_alignment";
  * @type {string}
  */
 export const AC4_TOC_END = "ac4_toc_end";
+
+/**
+ * @constant
+ * @type {string}
+ */
+export const PAYLOAD_BASE = "payload_base";

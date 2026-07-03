@@ -3,8 +3,8 @@
 The copyright in this software is being made available under the BSD License, included below. This software may be subject to other third party and contributor rights, including patent rights, and no such rights are granted under this license.
 
 
-**Copyright (C) 2023-2024 by Dolby Laboratories**
-**Copyright (C) 2023 by Dolby International AB.**
+**Copyright (C) 2023-2026 by Dolby Laboratories**
+**Copyright (C) 2023-2026 by Dolby International AB.**
 **All rights reserved.**
  
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
