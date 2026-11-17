@@ -2,7 +2,7 @@
   "name": "@dolbylaboratories/alps",
   "main": "dist/alps.bundle.min.js",
   "types": "dist/alps.d.ts",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "publishConfig": {
     "access": "public"
   },

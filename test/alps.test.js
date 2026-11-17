@@ -123,6 +123,21 @@ describe("#Alps", () => {
           expect(Buffer.from(buffer, 0)).toEqual(bufferWithSelectedPresentationId2);
         });
       });
+
+      describe("segment with multiple fragments", () => {
+        it.each([
+          [0, bufferWithSelectedPresentationId0],
+          [1, bufferWithSelectedPresentationId1],
+          [2, bufferWithSelectedPresentationId2],
+        ])("should process every fragment for activePresentationId %i", (presentationId, expectedFragment) => {
+          // test_seg.m4s is a single moof+mdat, so concatenating it yields a 3-fragment segment
+          const buffer = new Uint8Array(Buffer.concat([originalBuffer, originalBuffer, originalBuffer])).buffer;
+          const result = alps.processIsoBmffSegment(buffer, undefined, presentationId);
+
+          expect(result.forcedPresentationId).toBe(presentationId);
+          expect(Buffer.from(buffer, 0)).toEqual(Buffer.concat([expectedFragment, expectedFragment, expectedFragment]));
+        });
+      });
     });
 
     describe("Verify incompatible stream protection", () => {

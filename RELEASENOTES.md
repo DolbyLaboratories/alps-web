@@ -1,3 +1,11 @@
+# 3.1.0
+
+This release includes the following changes since the 3.0.0
+
+### Features
+
+- Support segments with multiple fragments (multiple `moof`/`mdat` pairs in one media segment)
+
 # 3.0.0
 
 This release includes the following changes since the 2.0.0

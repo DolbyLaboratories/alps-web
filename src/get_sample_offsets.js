@@ -37,57 +37,61 @@ import * as isoBmffBox from "./constants/isobmff_box_names.js";
 
 /**
  * Calculates offsets and sizes of individual samples within the media data.
+ * Samples of all movie fragments (moof + mdat pairs) in the segment are returned, in fragment order;
+ * each fragment's offsets are resolved relative to its own moof box.
  *
  * @param {ISOFile} parsedBuffer - The parsed buffer containing ISOBMFF boxes
  * @returns {SampleData[]} An array of objects containing the offset and size of each sample
+ * @throws {Error} If a track fragment does not use the default-base-is-moof addressing mode
  */
 const getSampleOffsets = (parsedBuffer) => {
   const sampleOffsets = [];
   const DEFAULT_BASE_IS_MOOF_FLAG_OFFSET = 0x020000;
-  // must be exactly one in a media segment
-  const movieFragment = parsedBuffer.fetch(isoBmffBox.MOVIE_FRAGMENT);
 
-  let isFirstTrackFragment = true;
+  // a media segment may carry multiple fragments (moof + mdat pairs)
+  for (const movieFragment of parsedBuffer.fetchAll(isoBmffBox.MOVIE_FRAGMENT)) {
+    let isFirstTrackFragment = true;
 
-  for (const trackFragment of parsedBuffer.fetchAll(isoBmffBox.TRACK_FRAGMENT)) {
-    // Exactly one must be present per traf
-    const trackFragmentHeader = trackFragment.boxes.find((box) => box.type === isoBmffBox.TRACK_FRAGMENT_HEADER);
+    for (const trackFragment of movieFragment.boxes.filter((box) => box.type === isoBmffBox.TRACK_FRAGMENT)) {
+      // Exactly one must be present per traf
+      const trackFragmentHeader = trackFragment.boxes.find((box) => box.type === isoBmffBox.TRACK_FRAGMENT_HEADER);
 
-    const baseDataOffset = trackFragmentHeader.base_data_offset || 0;
-    const defaultBaseIsMoof = trackFragmentHeader.flags & DEFAULT_BASE_IS_MOOF_FLAG_OFFSET;
+      const baseDataOffset = trackFragmentHeader.base_data_offset || 0;
+      const defaultBaseIsMoof = trackFragmentHeader.flags & DEFAULT_BASE_IS_MOOF_FLAG_OFFSET;
 
-    if (baseDataOffset) {
-      /* base_data_offset is relative to the file identified by the referenced data reference entry */
-      throw Error(
-        "base_data_offset is relative to the file identified by the referenced data reference entry unsupported",
-      );
-    }
-
-    if (!defaultBaseIsMoof) {
-      if (isFirstTrackFragment) {
-        /* base_data_offset is relative to the first byte of the MovieFragmentBox containing this box */
+      if (baseDataOffset) {
+        /* base_data_offset is relative to the file identified by the referenced data reference entry */
         throw Error(
-          "base_data_offset is relative to the first byte of the MovieFragmentBox containing this box unsupported",
+          "base_data_offset is relative to the file identified by the referenced data reference entry unsupported",
         );
       }
-      /* base_data_offset is relative to the end of the data defined by the preceding track fragment */
-      throw Error(
-        "base_data_offset is relative to the end of the data defined by the preceding track fragment is unsupported",
-      );
-    }
 
-    /* base_data_offset is relative to the first byte of the MovieFragmentBox containing this box */
-    const relative = movieFragment._offset;
-
-    for (const trackFragmentRun of trackFragment.boxes.filter((box) => box.type === isoBmffBox.TRACK_FRAGMENT_RUN)) {
-      let sampleOffset = relative + baseDataOffset + trackFragmentRun.data_offset;
-      for (const sample of trackFragmentRun.samples) {
-        sampleOffsets.push({ offset: sampleOffset, size: sample.sample_size });
-        sampleOffset += sample.sample_size;
+      if (!defaultBaseIsMoof) {
+        if (isFirstTrackFragment) {
+          /* base_data_offset is relative to the first byte of the MovieFragmentBox containing this box */
+          throw Error(
+            "base_data_offset is relative to the first byte of the MovieFragmentBox containing this box unsupported",
+          );
+        }
+        /* base_data_offset is relative to the end of the data defined by the preceding track fragment */
+        throw Error(
+          "base_data_offset is relative to the end of the data defined by the preceding track fragment is unsupported",
+        );
       }
-    }
 
-    isFirstTrackFragment = false;
+      /* base_data_offset is relative to the first byte of the MovieFragmentBox containing this box */
+      const relative = movieFragment._offset;
+
+      for (const trackFragmentRun of trackFragment.boxes.filter((box) => box.type === isoBmffBox.TRACK_FRAGMENT_RUN)) {
+        let sampleOffset = relative + baseDataOffset + trackFragmentRun.data_offset;
+        for (const sample of trackFragmentRun.samples) {
+          sampleOffsets.push({ offset: sampleOffset, size: sample.sample_size });
+          sampleOffset += sample.sample_size;
+        }
+      }
+
+      isFirstTrackFragment = false;
+    }
   }
 
   return sampleOffsets;

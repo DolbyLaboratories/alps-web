@@ -142,7 +142,7 @@ const processIsoBmffInitSegment = (parsedSegmentBuffer) => {
 };
 
 /**
- * Process an ISOBMFF media segment buffer
+ * Process an ISOBMFF media segment buffer. All samples of all movie fragments in the segment are processed.
  * @param {ISOBoxer} parsedSegmentBuffer - The ISOBMFF segment buffer to process
  * @param {number} activePresentationId - Presentation ID that should be selected for processing
  * @returns {number|null} Presentation ID of enforced presentation

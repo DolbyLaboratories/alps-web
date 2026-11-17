@@ -180,7 +180,7 @@ export class Alps {
   }
 
   /**
-   * Process an ISOBMFF segment buffer
+   * Process an ISOBMFF segment buffer. A media segment may contain multiple movie fragments (moof + mdat pairs); all of them are processed.
    * @param {ArrayBuffer} segmentBuffer - The ISOBMFF segment buffer to process
    * @param {string|null} streamId - Stream ID for Segment buffer, null for non-multi-period use
    * @param {number|undefined} activePresentationId - Forced presentation ID that should be selected for processing, use -1 for TV default, and leave undefined to use value set by setActivePresentationId. This parameter takes precedence over this.activePresentationId
